@@ -363,6 +363,24 @@
   .empty { padding: 20px 16px 22px; color: var(--ink-2); font-size: 13.5px; line-height: 1.6; text-align: center; }
   .empty b { color: var(--ink); font-weight: 600; }
 
+  /* ---------------- supply ----------------
+     Two bars against one another: doses out of the pack over days out of
+     the pack. Whenever the top bar runs ahead of the bottom one, the pack
+     is going faster than a day at a time — that gap IS the finding, so it
+     is what the panel draws. */
+  .pack { display: flex; flex-direction: column; gap: 13px; padding: 13px 16px 14px; }
+  .pack-top { display: flex; align-items: center; gap: 18px; }
+  .pace { display: flex; flex-direction: column; gap: 8px; }
+  .pace-row { display: grid; grid-template-columns: 58px 1fr 44px; align-items: center; gap: 9px; }
+  .pace-l { color: var(--ink-3); }
+  .pace-v { font-size: 10.5px; color: var(--ink-2); text-align: right; }
+  .bar > i.spent { background: var(--copper); }
+  .bar > i.spent.over { background: var(--neg); }
+  .bar > i.gone { background: var(--line-2); }
+  .pack-note { font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+  .pack-note b { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); }
+  .pack-note.over b { color: var(--neg); }
+
   /* ---------------- sync ---------------- */
   .syncbar {
     display: flex; align-items: center; gap: 9px; padding: 10px 16px;
@@ -476,6 +494,12 @@
   </section>
 
   <section class="panel">
+    <div class="panel-head"><span class="code">IR Supply</span><span class="code" id="packHead">No Pack</span></div>
+    <div class="stats act" id="supply"></div>
+    <div id="packBody"></div>
+  </section>
+
+  <section class="panel">
     <div class="panel-head">
       <div class="mnav">
         <button class="mshuttle" id="mprev" aria-label="Previous Month">
@@ -563,6 +587,20 @@
   var EXTRAS = [
     { key: "extraIr", code: "IR", label: "Extra IR", min: 5, max: 40, unit: "mg" },
     { key: "extraXr", code: "XR", label: "Extra XR", min: 5, max: 40, unit: "mg" }
+  ];
+
+  /* IR comes in a pack meant to last a day at a time, so the question is
+     never the raw count but the count against the days gone. `irFill` marks
+     the day a pack was opened and how many it held — a plain per-day field,
+     so a refill merges across devices like anything else and the history
+     keeps every pack rather than just the current one. */
+  var IR_RATE = 1;        // doses a day the pack is sized for
+  var IR_PACK = 30;       // default pack size, offered on the refill field
+  var IR_MIN_DAYS = 3;    // days into a pack before the guardrail will speak
+
+  var SUPPLY = [
+    { key: "irTaken", code: "IRT", label: "IR Taken Today", min: 0, max: 9,   unit: "doses" },
+    { key: "irFill",  code: "IRF", label: "Refill — New Pack", min: 0, max: 400, unit: "doses" }
   ];
 
   var ENERGY = [
@@ -849,6 +887,7 @@
   var statNodes = {};
   buildNumericFields(STATS, "stats");
   buildNumericFields(EXTRAS, "extras");
+  buildNumericFields(SUPPLY, "supply");
 
   function buildNumericFields(list, hostId) { list.forEach(function (s) {
     var wrap = document.createElement("label");
@@ -1143,6 +1182,100 @@
     return null;
   }
 
+  /* ---- IR supply ---- */
+  function dayGap(a, b) { return Math.round((fromISO(b) - fromISO(a)) / 86400000); }
+
+  /* The open pack is the most recent refill on or before today; everything
+     taken since counts against it. Returns null until a pack is opened. */
+  function packState() {
+    var today = todayISO(), start = null, size = 0;
+    Object.keys(data).sort().forEach(function (k) {
+      if (k <= today && data[k] && data[k].irFill > 0) { start = k; size = data[k].irFill; }
+    });
+    if (!start) return null;
+
+    var taken = 0, elapsed = 0, k = start, guard = 0;
+    while (k <= today && guard++ < SCAN) {
+      taken += (data[k] && data[k].irTaken) || 0;
+      elapsed++;
+      k = shift(k, 1);
+    }
+
+    var left = Math.max(0, size - taken);
+    var packDays = Math.max(1, Math.round(size / IR_RATE));
+    var pace = elapsed ? taken / elapsed : 0;
+    return {
+      start: start, size: size, taken: taken, left: left, over: Math.max(0, taken - size),
+      elapsed: elapsed, packDays: packDays, pace: pace,
+      ahead: taken - elapsed * IR_RATE,
+      dueKey: shift(start, packDays - 1),
+      outKey: pace > 0 ? shift(today, Math.ceil(left / pace)) : null
+    };
+  }
+
+  function shortDate(k) {
+    return fromISO(k).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+
+  function renderSupply() {
+    var p = packState(), head = $("packHead"), host = $("packBody");
+
+    if (!p) {
+      head.textContent = "No Pack";
+      host.innerHTML = '<p class="empty">No pack open yet.<br>Put the pack size in ' +
+        '<b>Refill</b> on the day you started it — ' + IR_PACK + ' is the usual — then log ' +
+        'each day under <b>IR Taken</b>.</p>';
+      return;
+    }
+
+    head.textContent = "Pack of " + p.size;
+    var early = p.outKey ? dayGap(p.outKey, p.dueKey) : 0;
+    var spentPct = Math.min(100, p.taken / p.size * 100);
+    var gonePct = Math.min(100, p.elapsed / p.packDays * 100);
+    var over = p.ahead >= 0.5;
+
+    var note;
+    if (p.left === 0) {
+      note = "The pack is <b>empty</b>" +
+        (p.over ? ", with <b>" + p.over + "</b> taken past it" : "") +
+        ". Log the next refill to start a new one.";
+    } else if (over) {
+      note = "Going at <b>" + p.pace.toFixed(1) + " a day</b>, not " + IR_RATE + ". At this rate the " +
+             "pack runs out <b>" + shortDate(p.outKey) + "</b>" +
+             (early >= 1 ? ", <b>" + early + " day" + (early === 1 ? "" : "s") + "</b> before a " +
+                           p.packDays + "-day pack should" : "") + ".";
+    } else if (p.ahead <= -0.5) {
+      note = "Going at <b>" + p.pace.toFixed(1) + " a day</b>, under " + IR_RATE + ". The pack should " +
+             "last past <b>" + shortDate(p.dueKey) + "</b>.";
+    } else {
+      note = "On a " + IR_RATE + "-a-day pace. The pack lasts to <b>" + shortDate(p.dueKey) + "</b>.";
+    }
+
+    host.innerHTML =
+      '<div class="pack">' +
+        '<div class="pack-top">' +
+          '<div class="score"><span class="score-n">' + p.left + '</span>' +
+            '<span class="score-d">/' + p.size + '</span></div>' +
+          '<div class="readout-meta">' +
+            '<span class="code readout-label">Doses Left</span>' +
+            '<div class="bar"><i style="width:' + (100 - spentPct).toFixed(1) + '%"></i></div>' +
+            '<span class="readout-note">Day ' + p.elapsed + ' of ' + p.packDays +
+              ' \u00b7 ' + p.pace.toFixed(1) + ' a day</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="pace">' +
+          '<div class="pace-row"><span class="code pace-l">Pack Used</span>' +
+            '<div class="bar"><i class="spent' + (over ? " over" : "") +
+              '" style="width:' + spentPct.toFixed(1) + '%"></i></div>' +
+            '<span class="num pace-v">' + p.taken + '/' + p.size + '</span></div>' +
+          '<div class="pace-row"><span class="code pace-l">Days Gone</span>' +
+            '<div class="bar"><i class="gone" style="width:' + gonePct.toFixed(1) + '%"></i></div>' +
+            '<span class="num pace-v">' + p.elapsed + '/' + p.packDays + '</span></div>' +
+        '</div>' +
+        '<p class="pack-note' + (over ? " over" : "") + '">' + note + '</p>' +
+      '</div>';
+  }
+
   /* ============================================================
      Guardrails
      ============================================================ */
@@ -1185,6 +1318,24 @@
                 (delta > 0 ? "+" : "−") + Math.abs(delta).toFixed(t.dp) + t.unit + ")."
       });
     });
+
+    var pk = packState();
+    if (pk && pk.elapsed >= IR_MIN_DAYS) {
+      if (pk.left === 0) {
+        alerts.push({
+          name: "IR Supply",
+          detail: "The pack is <b>empty</b> on day <b>" + pk.elapsed + "</b> of " + pk.packDays +
+                  (pk.over ? ", with <b>" + pk.over + "</b> taken past it" : "") + "."
+        });
+      } else if (pk.outKey && dayGap(pk.outKey, pk.dueKey) >= 3) {
+        alerts.push({
+          name: "IR Supply",
+          detail: "<b>" + pk.left + " left</b> of " + pk.size + " at <b>" + pk.pace.toFixed(1) +
+                  " a day</b> — about <b>" + dayGap(pk.outKey, pk.dueKey) +
+                  " days</b> short of the " + pk.packDays + " the pack is meant to cover."
+        });
+      }
+    }
 
     /* Compliance, collapsed into one row — a line per lapsed marker
        would drown the trend flags, which are the rarer signal. */
@@ -1278,7 +1429,7 @@
       }
     });
 
-    STATS.concat(EXTRAS).forEach(function (s) {
+    STATS.concat(EXTRAS).concat(SUPPLY).forEach(function (s) {
       var n = statNodes[s.key], v = d[s.key];
       n.input.value = (v === undefined || v === null) ? "" : v;
       paintGauge(s, n.fill, v === undefined ? null : v);
@@ -1310,6 +1461,7 @@
     renderSpan();
     renderSummary();
     renderCurve();
+    renderSupply();
     renderGrid();
     renderPatterns();
     renderGuard();
@@ -1451,6 +1603,12 @@
         return { op: (0.32 + 0.68 * (v - x.min) / (x.max - x.min)).toFixed(2), t: v + " mg", n: v };
       }, avg1);
     });
+
+    html += line("IRT", null, "on", function (d) {
+      var v = d.irTaken;
+      if (v === undefined) return null;
+      return { op: (0.3 + 0.7 * Math.min(1, v / 3)).toFixed(2), t: v + " doses", n: v };
+    }, avg1);
 
     html += '<div class="grid-rule"></div>';
     html += line("WRK", "var(--copper)", "c", function (d) {
@@ -1616,12 +1774,26 @@
     v = v === undefined || v === null ? "" : String(v);
     return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
   }
+  /* doses left in the open pack at the end of day k — the column that makes
+     the export auditable without replaying it */
+  function leftAfter(k) {
+    var start = null, size = 0;
+    Object.keys(data).sort().forEach(function (j) {
+      if (j <= k && data[j] && data[j].irFill > 0) { start = j; size = data[j].irFill; }
+    });
+    if (!start) return "";
+    var taken = 0, j = start, guard = 0;
+    while (j <= k && guard++ < SCAN) { taken += (data[j] && data[j].irTaken) || 0; j = shift(j, 1); }
+    return Math.max(0, size - taken);
+  }
+
   function csv() {
     var head = ["Date", "Weekday"]
       .concat(MARKERS.map(markerLabel))
       .concat(["Bed Time", "Wake Time", "Time in Bed"])
       .concat(STATS.map(function (s) { return s.label; }))
       .concat(EXTRAS.map(function (x) { return x.label + " (mg)"; }))
+      .concat(["IR Taken", "IR Refill", "IR Left"])
       .concat(ENERGY.map(function (e) { return "Energy " + e.sub; }))
       .concat(["Work Productivity"])
       .concat(CHOICE_ROWS.map(function (c) { return c.name; }))
@@ -1637,6 +1809,9 @@
         .concat([d.bed || "", d.wake || "", bedM === null ? "" : hm(bedM)])
         .concat(STATS.map(function (s) { return d[s.key] === undefined ? "" : d[s.key]; }))
         .concat(EXTRAS.map(function (x) { return d[x.key] === undefined ? "" : d[x.key]; }))
+        .concat([d.irTaken === undefined ? "" : d.irTaken,
+                 d.irFill === undefined ? "" : d.irFill,
+                 leftAfter(k)])
         .concat(ENERGY.map(function (e) { return d[e.key] || ""; }))
         .concat([d.work || ""])
         .concat(CHOICE_ROWS.map(function (c) { return choiceLabel(d[c.key]); }))
