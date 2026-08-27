@@ -20,6 +20,21 @@ node roundtrip.test.js                # from a dir where jsdom resolves
 node supply.test.js
 ```
 
+## Publishing without losing the log
+
+The built file in this repo always carries an **empty** seed, so no health data
+lands in git. The live log therefore exists only in the published artifact —
+which means a republish has to carry it forward:
+
+1. Read the live page's `id="seed"` block (unescape `<\/` back to `</`).
+2. `python3 build.py --seed live.json -o publish.html`
+3. Publish `publish.html`.
+
+Publishing the repo's `daily-readout.html` directly wipes every logged day.
+The publish path refuses a stale write, so a page that saved itself since your
+last publish will reject the call rather than let it clobber — merge the seed
+it hands back and publish again.
+
 ## How saving works
 
 The log lives in two places. `localStorage` is the instant local copy: edits land
