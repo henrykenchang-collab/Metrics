@@ -55,11 +55,16 @@ ok(again == days, "a second run changes nothing")
 ok("nothing to change" in log2, "and reports that plainly")
 
 print("\n-- safety --")
-env = dict(os.environ); env.pop("OURA_TOKEN", None)
+env = dict(os.environ)
+env.pop("OURA_TOKEN", None)
+env["OURA_TOKEN_FILE"] = os.path.join(tempfile.mkdtemp(), "absent.json")   # no cached login
 d = tempfile.mkdtemp(); p = os.path.join(d, "s.json"); json.dump(SEED, open(p, "w"))
 r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "oura_sync.py"), "--seed", p],
                    capture_output=True, text=True, env=env)
-ok(r.returncode != 0 and "OURA_TOKEN" in (r.stdout + r.stderr), "refuses to run without a token, and says why")
+out = r.stdout + r.stderr
+ok(r.returncode != 0, "refuses to run when nothing is connected")
+ok("oura_auth.py login" in out, "and names the command that fixes it")
+ok("token" not in out.lower() or "access_token" not in out, "without printing anything secret")
 
 print("\n" + ("all passed" if not fails else "%d FAILED" % len(fails)))
 sys.exit(1 if fails else 0)

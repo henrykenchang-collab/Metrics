@@ -1,0 +1,10 @@
+# OAuth tokens live in ~/.config/daily-readout/, never here — but if anyone
+# ever points OURA_TOKEN_FILE at the repo, this keeps it out of a commit.
+oura.json
+*.token
+.env
+
+# working files from a publish
+publish.html
+live-seed.json
+node_modules/

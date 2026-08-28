@@ -12,8 +12,10 @@ Claude Artifact. One page, no build tooling beyond a single Python script.
 | `daily-readout.html` | generated; the file that gets published. Do not edit by hand |
 | `test/roundtrip.test.js` | jsdom tests, mostly guarding the self-republish |
 | `test/supply.test.js` | jsdom tests for the IR pack arithmetic |
+| `tools/oura_auth.py` | OAuth2 against Oura, run on your own machine |
 | `tools/oura_sync.py` | pulls sleep figures from an Oura ring into a seed |
 | `test/oura.test.py` | rules the puller must not break |
+| `test/oura_auth.test.py` | token cache: expiry, rotation, file mode |
 
 ```sh
 python3 build.py                      # rebuild after editing src/page.html
@@ -73,20 +75,31 @@ projection lands short — going under a dose a day is not a problem to flag.
 ## Oura
 
 `tools/oura_sync.py` folds a ring's nightly figures into a seed: sleep score,
-HRV, resting heart rate, and bed/wake times. Three things have to be true
-before it can run.
+HRV, resting heart rate, and bed/wake times.
 
-1. The environment's network policy must allow `api.ouraring.com` — it is
-   denied by default, and the puller says so rather than failing obscurely.
-2. `OURA_TOKEN` must be set as an environment variable. Never a file, never an
-   argument, never pasted into a chat.
-3. The field mapping is written against Oura's documented v2 shapes but has not
-   been checked against a real account. Read a dry run before trusting it.
+**This runs on your laptop, not in a cloud session.** Oura retired Personal
+Access Tokens, so what you get now is an OAuth2 refresh token that Oura may
+rotate — and a rotated token needs somewhere durable to land. A cloud
+environment is the wrong home for it twice over: it has no secrets store, and
+its filesystem does not survive the session.
 
 ```sh
-python3 tools/oura_sync.py --seed live-seed.json                 # dry run
+python3 tools/oura_auth.py login       # once — opens a browser
+python3 tools/oura_auth.py status      # what is cached, without printing it
+python3 tools/oura_sync.py --seed live-seed.json                  # dry run
 python3 tools/oura_sync.py --seed live-seed.json --out m.json --write
-python3 build.py --seed m.json -o publish.html
+```
+
+Tokens are cached in `~/.config/daily-readout/oura.json`, mode 600, outside the
+repo. Nothing prints a secret. An existing Personal Access Token still works if
+you have one: set `OURA_TOKEN` and the OAuth path is skipped.
+
+The two OAuth endpoints come from Oura's published documentation and have NOT
+been exercised — the machine this was written on cannot reach Oura. Both are
+overridable without touching code, and a wrong one produces a plain error:
+
+```sh
+export OURA_AUTH_URL=...  OURA_TOKEN_URL=...  OURA_SCOPES=...
 ```
 
 The ring owns five fields and records which ones it wrote (`_o`). It will

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pull sleep figures from an Oura ring into a Daily Readout seed.
 
-    export OURA_TOKEN=...                 # never on the command line
+    python3 tools/oura_auth.py login      # once, on your own machine
     python3 tools/oura_sync.py --seed live-seed.json            # dry run
     python3 tools/oura_sync.py --seed live-seed.json --out merged.json --write
 
@@ -16,6 +16,9 @@ run fails loudly rather than writing a number it is unsure of. Look at a dry
 run before trusting it.
 """
 import argparse, datetime, json, os, sys, urllib.error, urllib.request
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import oura_auth
 
 BASE = "https://api.ouraring.com/v2/usercollection/"
 OWNED = ("sleep", "hrv", "hr", "bed", "wake")
@@ -166,10 +169,10 @@ def main():
         fetch = lambda path, *a, **k: fx.get(path, [])
         ring = readings("fixture", str(start), str(end), warn)
     else:
-        token = os.environ.get("OURA_TOKEN")
-        if not token:
-            sys.exit("OURA_TOKEN is not set. Put it in the environment's variables, "
-                     "never on the command line or in a file.")
+        try:
+            token = oura_auth.access_token()      # refreshes and re-saves if stale
+        except oura_auth.AuthError as e:
+            sys.exit("oura: %s" % e)
         ring = readings(token, str(start), str(end), warn)
 
     seed, changes, skipped = merge(seed, ring)
