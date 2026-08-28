@@ -12,6 +12,8 @@ Claude Artifact. One page, no build tooling beyond a single Python script.
 | `daily-readout.html` | generated; the file that gets published. Do not edit by hand |
 | `test/roundtrip.test.js` | jsdom tests, mostly guarding the self-republish |
 | `test/supply.test.js` | jsdom tests for the IR pack arithmetic |
+| `tools/oura_sync.py` | pulls sleep figures from an Oura ring into a seed |
+| `test/oura.test.py` | rules the puller must not break |
 
 ```sh
 python3 build.py                      # rebuild after editing src/page.html
@@ -67,6 +69,30 @@ recent refill on or before today, which means history keeps every pack rather
 than only the current one, and a refill merges across devices like any other
 day. The guardrail speaks only once a pack is a few days old and only when the
 projection lands short — going under a dose a day is not a problem to flag.
+
+## Oura
+
+`tools/oura_sync.py` folds a ring's nightly figures into a seed: sleep score,
+HRV, resting heart rate, and bed/wake times. Three things have to be true
+before it can run.
+
+1. The environment's network policy must allow `api.ouraring.com` — it is
+   denied by default, and the puller says so rather than failing obscurely.
+2. `OURA_TOKEN` must be set as an environment variable. Never a file, never an
+   argument, never pasted into a chat.
+3. The field mapping is written against Oura's documented v2 shapes but has not
+   been checked against a real account. Read a dry run before trusting it.
+
+```sh
+python3 tools/oura_sync.py --seed live-seed.json                 # dry run
+python3 tools/oura_sync.py --seed live-seed.json --out m.json --write
+python3 build.py --seed m.json -o publish.html
+```
+
+The ring owns five fields and records which ones it wrote (`_o`). It will
+correct its own earlier numbers, and will never overwrite one entered by hand —
+if you typed a night in yourself, you meant it, and the run says out loud where
+it deferred to you.
 
 ## Schedules
 

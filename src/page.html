@@ -706,6 +706,7 @@
 
   var PAGE_TITLE = "Daily Readout";
   var STAMP = "_t";      // per-day last-write stamp — bookkeeping, never part of the log
+  var FROMRING = "_o";   // which of a day's fields the Oura puller owns
   var PUSH_BASE = 2500;  // ms of quiet before the page saves itself
 
   /* Sync state lives up here because the boot code below decides whether
@@ -1179,7 +1180,7 @@
   function mean(a) { return a.reduce(function (x, y) { return x + y; }, 0) / a.length; }
   function logged(d) {
     if (!d) return false;
-    for (var k in d) if (d.hasOwnProperty(k) && k !== STAMP) return true;
+    for (var k in d) if (d.hasOwnProperty(k) && k !== STAMP && k !== FROMRING) return true;
     return false;
   }
   function outcomeOf(d, which) {
