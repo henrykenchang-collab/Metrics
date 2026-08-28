@@ -127,6 +127,9 @@
   .shuttle svg { width: 15px; height: 15px; }
   .datewrap { flex: 1; text-align: center; min-width: 0; }
   .dow { color: var(--accent); display: block; }
+  /* off today: copper, the hue this app already uses for "you said so" */
+  .dow.past { color: var(--copper); }
+  .today-btn.past { color: var(--copper); border-bottom-color: var(--copper); }
   .date { font-size: 20px; font-weight: 700; letter-spacing: -.02em; display: block; margin-top: 1px; }
   .today-btn { display: inline-block; margin-top: 3px; color: var(--ink-3); border-bottom: 1px dashed var(--line-2); }
   .today-btn[hidden] { display: none; }
@@ -888,10 +891,13 @@
   }
 
   var cur = todayISO();
-  // a save can reload the view; come back to the day that was open
+  /* A save can reload the view, so the day being edited survives one. It is
+     deliberately NOT remembered across midnight: a tab left open overnight
+     that comes back still pointing at yesterday is how an evening's entries
+     end up filed on the wrong date. */
   try {
-    var keep = sessionStorage.getItem("dailyReadout.cur");
-    if (keep && /^\d{4}-\d{2}-\d{2}$/.test(keep) && keep <= cur) cur = keep;
+    var keep = JSON.parse(sessionStorage.getItem("dailyReadout.cur") || "null");
+    if (keep && keep.on === cur && /^\d{4}-\d{2}-\d{2}$/.test(keep.d) && keep.d <= cur) cur = keep.d;
   } catch (e) {}
   var gridY = fromISO(cur).getFullYear(), gridM = fromISO(cur).getMonth();
   var $ = function (id) { return document.getElementById(id); };
@@ -1409,12 +1415,21 @@
   function render() {
     commitJournal();          // never overwrite the textarea with a write still pending
     syncGridToCur();          // the month view follows the day you're on
-    try { sessionStorage.setItem("dailyReadout.cur", cur); } catch (e) {}
+    try {
+      sessionStorage.setItem("dailyReadout.cur", JSON.stringify({ d: cur, on: todayISO() }));
+    } catch (e) {}
 
     var d = data[cur] || {};
     var dt = fromISO(cur), isToday = cur === todayISO();
 
-    $("dow").textContent = isToday ? "Today" : dt.toLocaleDateString(undefined, { weekday: "long" });
+    /* "Wednesday" reads like a label; "Yesterday" reads like a warning, which
+       is what it is when you are about to log today's tick onto it. */
+    var back = dayGap(cur, todayISO());
+    $("dow").textContent = isToday ? "Today"
+      : back === 1 ? "Yesterday"
+      : dt.toLocaleDateString(undefined, { weekday: "long" }) + " \u00b7 " + back + " days back";
+    $("dow").classList.toggle("past", !isToday);
+    $("todayBtn").classList.toggle("past", !isToday);
     $("date").textContent = dt.toLocaleDateString(undefined, { month: "long", day: "numeric" });
     $("todayBtn").hidden = isToday;
     $("next").disabled = isToday;
