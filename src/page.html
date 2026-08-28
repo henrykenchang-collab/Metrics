@@ -552,11 +552,12 @@
 
   <div class="foot">
     <button class="btn code" id="copyBtn">Copy CSV</button>
-    <button class="btn code" id="installBtn">Add to Home Screen</button>
+    <button class="btn code" id="installBtn">Home Screen</button>
   </div>
 
   <p class="tip">Kept on this device and synced to your Claude account, so a day logged here shows up on your laptop and iPhone.
-    <br>On iPhone: <b>Share</b> → <b>Add to Home Screen</b> for a full-screen app icon.</p>
+    <br>Open it from <b>Claude</b> on each device for that. A Home Screen copy still logs, but saves to that
+    phone alone — the line above always says which one you are in.</p>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1854,7 +1855,9 @@
     } else fallback();
   });
 
-  $("installBtn").addEventListener("click", function () { toast("Share button → Add to Home Screen"); });
+  $("installBtn").addEventListener("click", function () {
+    toast("Share → Add to Home Screen. That copy won't sync.");
+  });
 
   var toastT;
   function toast(msg) {
