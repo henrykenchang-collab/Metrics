@@ -88,10 +88,24 @@
     line-height: 1.45;
   }
 
+
+  /* A corgi in the ground behind the page. Silhouette rather than picture, and
+     tinted from --ink rather than coloured in, so he follows the theme and stays
+     a whisper. Every panel is opaque, so he shows only in the gutters between
+     them and never has a number sitting on top of him. */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-color: var(--ink); opacity: .055;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Cpath%20d='M29%2031%2021%206c-.6-2.6%202-4%204.1-2.4L45.5%2020Z'/%3E%3Cpath%20d='M71%2031%2079%206c.6-2.6-2-4-4.1-2.4L54.5%2020Z'/%3E%3Ccircle%20cx='50'%20cy='41'%20r='23'/%3E%3Cpath%20d='M50%2049c-14%200-24.2%2013.8-26%2032-1%2010.2%206%2015%2026%2015s27-4.8%2026-15c-1.8-18.2-12-32-26-32z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Cpath%20d='M29%2031%2021%206c-.6-2.6%202-4%204.1-2.4L45.5%2020Z'/%3E%3Cpath%20d='M71%2031%2079%206c.6-2.6-2-4-4.1-2.4L54.5%2020Z'/%3E%3Ccircle%20cx='50'%20cy='41'%20r='23'/%3E%3Cpath%20d='M50%2049c-14%200-24.2%2013.8-26%2032-1%2010.2%206%2015%2026%2015s27-4.8%2026-15c-1.8-18.2-12-32-26-32z'/%3E%3C/svg%3E");
+    -webkit-mask-size: 116px 116px; mask-size: 116px 116px;
+    -webkit-mask-repeat: repeat; mask-repeat: repeat;
+  }
+
   button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; touch-action: manipulation; }
   button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 
   .shell {
+    position: relative; z-index: 1;          /* above the corgi */
     max-width: 480px; margin: 0 auto;
     padding: 14px 16px calc(28px + env(safe-area-inset-bottom));
     display: flex; flex-direction: column; gap: 13px;
