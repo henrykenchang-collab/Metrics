@@ -52,7 +52,7 @@ ok(ex.classList.contains("doses"),"the extras block is a list of rows now");
 ok(ex.querySelectorAll(".doserow").length===2,"two rows");
 ok(!ex.querySelector(".gauge"),"no gauges");
 const r0=ex.querySelectorAll(".doserow")[0];
-ok(r0.querySelector(".dose-name").textContent==="Extra IR:","label reads 'Extra IR:'");
+ok(r0.querySelector(".dose-name").textContent==="Extra/Under IR:","label reads 'Extra/Under IR:'");
 ok(r0.querySelector(".dose-unit").textContent==="mg","unit sits after the number");
 const parts=[...r0.children].map(e=>e.className);
 ok(parts.join(">")==="dose-name>dosein>dose-unit","label, then number, then unit, in one row: "+parts.join(" > "));

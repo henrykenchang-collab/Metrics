@@ -252,7 +252,7 @@
   .dose-name { flex: 1; font-size: 15px; font-weight: 500; letter-spacing: -.01em; }
   .dosein {
     font-family: var(--mono); font-variant-numeric: tabular-nums;
-    font-size: 15px; font-weight: 700; width: 3.6ch; text-align: right;
+    font-size: 15px; font-weight: 700; width: 4.4ch; text-align: right;
     padding: 0; color: var(--accent); background: none; border: 0;
     -webkit-appearance: none; appearance: none;
   }
@@ -657,8 +657,10 @@
   /* Quantified intakes — same family as the markers (things you take),
      so they carry the accent hue rather than the biometric violet. */
   var EXTRAS = [
-    { key: "extraIr", code: "IR", label: "Extra IR", min: 5, max: 40, unit: "mg" },
-    { key: "extraXr", code: "XR", label: "Extra XR", min: 5, max: 40, unit: "mg" }
+    /* signed: a negative is a dose skipped, so the field reads as net
+       deviation from the usual rather than as an amount taken */
+    { key: "extraIr", code: "IR", label: "Extra/Under IR", min: -40, max: 40, unit: "mg", signed: true },
+    { key: "extraXr", code: "XR", label: "Extra/Under XR", min: -40, max: 40, unit: "mg", signed: true }
   ];
 
   /* What is left is a matter of the calendar, not of counting: a refill covers
@@ -666,10 +668,6 @@
   var IR_DAYS = 30;       // an IR refill covers this many days
   var XR_DAYS = 60;       // an XR refill covers this many
   var LOW_DAYS = 7;       // start saying so this close to the end
-
-  var SUPPLY = [
-    { key: "irTaken", code: "IRT", label: "Taken Today", min: 0, max: 9, unit: "doses" }
-  ];
 
   var ENERGY = [
     { key: "ePre",  code: "E1", name: "Energy", sub: "Pre-Work AM" },
@@ -756,9 +754,9 @@
     /* Doses read as average mg per logged day, so a rise catches taking the
        same amount more often as well as taking more at a time. Days with none
        count as 0; the flag stays quiet until there are a few real doses. */
-    { label: "Extra IR",               dp: 1, unit: " mg",  move: 4,   good: "down", zeroFill: true,
+    { label: "Extra/Under IR",         dp: 1, unit: " mg",  move: 4,   good: "down", zeroFill: true,
       get: function (d) { return d.extraIr === undefined ? null : d.extraIr; } },
-    { label: "Extra XR",               dp: 1, unit: " mg",  move: 4,   good: "down", zeroFill: true,
+    { label: "Extra/Under XR",         dp: 1, unit: " mg",  move: 4,   good: "down", zeroFill: true,
       get: function (d) { return d.extraXr === undefined ? null : d.extraXr; } }
   ];
 
@@ -993,8 +991,6 @@
   var statNodes = {};
   buildNumericFields(STATS, "stats");
   buildNumericFields(EXTRAS, "extras", true);
-  buildNumericFields(SUPPLY, "supply", true);
-
   (function () {
     var wrap = document.createElement("label");
     wrap.className = "doserow";
@@ -1016,7 +1012,7 @@
     wrap.className = compact ? "doserow" : "stat";
     wrap.innerHTML = compact
       ? '<span class="dose-name">' + s.label + ':</span>' +
-        '<input class="dosein" type="text" inputmode="numeric" placeholder="––" maxlength="3" ' +
+        '<input class="dosein" type="text" inputmode="numeric" placeholder="––" maxlength="4" ' +
           'aria-label="' + s.label + ' (' + s.min + ' to ' + s.max + ')">' +
         '<span class="dose-unit">' + s.unit + '</span>'
       : '<span class="code stat-label">' + s.label + '</span>' +
@@ -1027,10 +1023,14 @@
 
     input.addEventListener("focus", function () { input.select(); });
     input.addEventListener("input", function () {
-      var clean = input.value.replace(/[^0-9]/g, "").slice(0, 3);
+      /* a lone "-" has to survive so the next keystroke can finish "-20",
+         but it is not a number, so nothing is stored until a digit lands */
+      var neg = !!(s.signed && input.value.charAt(0) === "-");
+      var digits = input.value.replace(/[^0-9]/g, "").slice(0, 3);
+      var clean = (neg ? "-" : "") + digits;
       if (clean !== input.value) input.value = clean;
       var d = day(cur);
-      if (clean === "") delete d[s.key]; else d[s.key] = +clean;
+      if (digits === "") delete d[s.key]; else d[s.key] = +clean;
       save(cur);
       paintGauge(s, fill, clean === "" ? null : +clean);
       renderSummary();
@@ -1357,7 +1357,13 @@
 
   /* The refill in force is the last one recorded on or before today; editing
      today's therefore overrides an older entry, which is what correcting a
-     date should do. Everything else is subtraction from the calendar. */
+     date should do.
+
+     The refill day itself counts as a full span: that day's dose came out of
+     the previous refill, so none of the new one is spent yet. Refill on the
+     1st and IR reads 30 that day, 29 on the 2nd, and 0 on the 31st — which is
+     the last day it covers, not the first day without. `out` is therefore the
+     last covered day, and the copy says so rather than "runs out". */
   function supplyState() {
     var today = todayISO(), start = null;
     Object.keys(data).sort().forEach(function (k) {
@@ -1400,11 +1406,14 @@
 
     var note;
     if (p.ir.left === 0 && p.xr.left === 0) {
-      note = "Both ran out — <b>IR " + shortDate(p.ir.out) + "</b>, <b>XR " + shortDate(p.xr.out) + "</b>.";
+      note = "Both are on their last day — <b>IR " + shortDate(p.ir.out) +
+             "</b>, <b>XR " + shortDate(p.xr.out) + "</b>.";
     } else if (p.ir.left === 0) {
-      note = "IR ran out <b>" + shortDate(p.ir.out) + "</b>. XR has <b>" + p.xr.left + " days</b>.";
+      note = "IR is on its last day, <b>" + shortDate(p.ir.out) + "</b>. XR has <b>" +
+             p.xr.left + " days</b>.";
     } else {
-      note = "IR runs out <b>" + shortDate(p.ir.out) + "</b> · XR <b>" + shortDate(p.xr.out) + "</b>.";
+      note = "IR lasts through <b>" + shortDate(p.ir.out) + "</b> · XR through <b>" +
+             shortDate(p.xr.out) + "</b>.";
     }
 
     host.innerHTML =
@@ -1466,12 +1475,15 @@
       [["IR", sp.ir], ["XR", sp.xr]].forEach(function (pair) {
         var name = pair[0] + " Supply", r = pair[1];
         if (r.left === 0) {
-          alerts.push({ name: name, detail: "Ran out on <b>" + shortDate(r.out) + "</b>." });
+          alerts.push({
+            name: name,
+            detail: "<b>" + shortDate(r.out) + "</b> is the last day this refill covers."
+          });
         } else if (r.left <= LOW_DAYS) {
           alerts.push({
             name: name,
-            detail: "<b>" + r.left + (r.left === 1 ? " day" : " days") + "</b> left — refill by <b>" +
-                    shortDate(r.out) + "</b>."
+            detail: "<b>" + r.left + (r.left === 1 ? " day" : " days") + "</b> left — the refill " +
+                    "covers you through <b>" + shortDate(r.out) + "</b>."
           });
         }
       });
@@ -1580,7 +1592,7 @@
       }
     });
 
-    STATS.concat(EXTRAS).concat(SUPPLY).forEach(function (s) {
+    STATS.concat(EXTRAS).forEach(function (s) {
       var n = statNodes[s.key], v = d[s.key];
       n.input.value = (v === undefined || v === null) ? "" : v;
       paintGauge(s, n.fill, v === undefined ? null : v);
@@ -1953,7 +1965,7 @@
       .concat(["Bed Time", "Wake Time", "Time in Bed"])
       .concat(STATS.map(function (s) { return s.label; }))
       .concat(EXTRAS.map(function (x) { return x.label + " (mg)"; }))
-      .concat(["IR Taken", "Refill Date", "IR Days Left", "XR Days Left"])
+      .concat(["Refill Date", "IR Days Left", "XR Days Left"])
       .concat(ENERGY.map(function (e) { return "Energy " + e.sub; }))
       .concat(["Work Productivity"])
       .concat(RATINGS.map(function (r) { return ratingLabel(r) + " Note"; }))
@@ -1970,8 +1982,7 @@
         .concat([d.bed || "", d.wake || "", bedM === null ? "" : hm(bedM)])
         .concat(STATS.map(function (s) { return d[s.key] === undefined ? "" : d[s.key]; }))
         .concat(EXTRAS.map(function (x) { return d[x.key] === undefined ? "" : d[x.key]; }))
-        .concat([d.irTaken === undefined ? "" : d.irTaken,
-                 d.refill || "",
+        .concat([d.refill || "",
                  daysLeftAt(k, IR_DAYS),
                  daysLeftAt(k, XR_DAYS)])
         .concat(ENERGY.map(function (e) { return d[e.key] === NA ? "N/A" : (d[e.key] || ""); }))

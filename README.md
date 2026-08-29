@@ -67,16 +67,27 @@ the same day on two devices resolves to whichever was written last.
 What is left is a matter of the calendar, not of counting: a refill covers a
 fixed run of days, so the date it happened is the only input. `refill` holds
 that date on the day it was entered, and the one in force is the last recorded
-on or before today — so editing today's corrects an older entry, which is what
-correcting a date should do.
+on or before today — so editing today's corrects an older entry.
 
-`IR_DAYS` is 30, `XR_DAYS` 60. The panel draws what is left of each against its
-span and names both run-out dates; the guardrail speaks at `LOW_DAYS` (7) and
-again at zero. `irTaken` still records the day's doses, but no longer drives the
-projection.
+The refill day itself counts as a full span, because that day's dose came out
+of the previous refill. Refill on the 1st and IR reads 30 that day, 29 on the
+2nd, 0 on the 31st — which is the **last day it covers**, not the first day
+without. The copy says "lasts through" for exactly that reason.
 
-`irFill`, the old pack-size field, is gone from the interface. Days that carry
-one keep it in storage, unread — nothing written is ever deleted.
+`IR_DAYS` is 30, `XR_DAYS` 60, and the guardrail speaks at `LOW_DAYS` (7) and
+again on the last day.
+
+`irTaken` and `irFill` are both gone from the interface. Days that carry them
+keep them in storage, unread — nothing written is ever deleted.
+
+## Doses
+
+`Extra/Under IR` and `Extra/Under XR` are signed: a positive is an extra dose,
+a negative one skipped, so the field reads as net deviation from the usual
+rather than as an amount taken. Only fields marked `signed` accept a minus —
+a sleep score or a heart rate still refuses one. A lone `-` is allowed to sit
+in the field so the next keystroke can finish `-20`, but nothing is stored
+until a digit lands.
 
 ## Schedules
 

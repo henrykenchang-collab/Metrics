@@ -52,22 +52,20 @@ c=open({});
 const sup=c.w.document.getElementById("supply");
 ok(sup.classList.contains("doses"),"it uses the same one-line rows as Extra IR/XR");
 ok(sup.classList.contains("tight"),"without a second rule under the panel head");
-ok(sup.querySelectorAll(".doserow").length===2,"two rows");
-ok(!sup.querySelector(".gauge"),"no gauges");
+ok(sup.querySelectorAll(".doserow").length===1,"one row now that Taken Today is gone");
 const names=[...sup.querySelectorAll(".dose-name")].map(e=>e.textContent);
-ok(names.join(" | ")==="Taken Today: | Refill Date:","labels: "+names.join(" | "));
-ok(sup.querySelectorAll(".dosein").length===1,"one number field");
+ok(names.join(" | ")==="Refill Date:","just the date: "+names.join(" | "));
+ok(sup.querySelectorAll(".dosein").length===0,"no number field left here");
 ok(sup.querySelectorAll(".datein").length===1,"and one date field");
 ok(/Refill Date/.test(c.w.document.getElementById("packBody").textContent),
    "the empty state points at it");
 
 console.log("\n-- and still works --");
-const taken=sup.querySelector(".dosein"), when=sup.querySelector(".datein");
+const when=sup.querySelector(".datein");
 when.value="2026-08-20"; when.dispatchEvent(new c.w.Event("change",{bubbles:true}));
-taken.value="2"; taken.dispatchEvent(new c.w.Event("input",{bubbles:true}));
-ok(store(c).irTaken===2&&store(c).refill==="2026-08-20","both fields record");
+ok(store(c).refill==="2026-08-20","the date records");
 ok(c.w.document.getElementById("packHead").textContent.indexOf("Refilled")===0,"the panel reads");
 ok(/Supply Left/.test(c.w.document.getElementById("packBody").textContent),"and the bars render");
-ok(c.w.document.getElementById("extras").querySelectorAll(".doserow").length===2,"Extra IR/XR unchanged");
+ok(c.w.document.getElementById("extras").querySelectorAll(".doserow").length===2,"Extra/Under rows unchanged");
 console.log(fail?"\n"+fail+" FAILED":"\nall passed");
 process.exit(fail?1:0);

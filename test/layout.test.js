@@ -56,7 +56,7 @@ ok(body.querySelectorAll(".pack-top").length===0,"the big score block is gone");
 ok(body.querySelectorAll(".pace-row").length===2,"two bars, one per drug");
 ok(/IR Supply Left/.test(body.textContent)&&/XR Supply Left/.test(body.textContent),
    "they read IR and XR supply left");
-ok(/runs out/.test(body.textContent),"the run-out dates still read");
+ok(/lasts through/.test(body.textContent),"the coverage dates still read");
 ok(c.w.document.getElementById("packHead").textContent.indexOf("Refilled")===0,
    "header names the refill date");
 console.log(fail?"\n"+fail+" FAILED":"\nall passed");

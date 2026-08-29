@@ -26,7 +26,7 @@ const dr=c.w.document.getElementById("refillDate");
 ok(!!dr,"a Refill Date field exists");
 ok(dr.type==="date","it is a real date input, so phones give a picker");
 ok(dr.closest(".doserow").querySelector(".dose-name").textContent==="Refill Date:","labelled, one line, like the others");
-ok(c.w.document.getElementById("supply").querySelectorAll(".doserow").length===2,"two rows: Taken Today and Refill Date");
+ok(c.w.document.getElementById("supply").querySelectorAll(".doserow").length===1,"one row: the Refill Date");
 ok(!c.w.document.querySelector("#supply .dosein[aria-label^='Refill']"),"the old pack-size number field is gone");
 ok(/Set a Refill Date/.test(body(c)),"empty state asks for the date: "+body(c).slice(0,70));
 
@@ -35,7 +35,7 @@ dr.value=back(12); dr.dispatchEvent(new c.w.Event("change",{bubbles:true}));
 ok(store(c).refill===back(12),"the date is stored");
 ok(bars(c).join(" | ")==="IR Supply Left=18/30 | XR Supply Left=48/60",
    "12 days in: 18 of 30 IR, 48 of 60 XR — "+bars(c).join(" | "));
-ok(/IR runs out/.test(body(c))&&/XR/.test(body(c)),"both run-out dates read");
+ok(/IR lasts through/.test(body(c))&&/XR/.test(body(c)),"both coverage dates read");
 ok(c.w.document.getElementById("packHead").textContent.indexOf("Refilled")===0,"header names the refill");
 
 console.log("\n-- Pack Used and Days Gone are gone --");
@@ -48,13 +48,13 @@ c=open({}); const d2=c.w.document.getElementById("refillDate");
 d2.value=back(30); d2.dispatchEvent(new c.w.Event("change",{bubbles:true}));
 ok(bars(c)[0]==="IR Supply Left=0/30","exactly 30 days on: IR is empty");
 ok(bars(c)[1]==="XR Supply Left=30/60","XR still has half");
-ok(/IR ran out/.test(body(c)),"the note says so");
+ok(/IR is on its last day/.test(body(c)),"the note says it is the last covered day");
 ok(/IR Supply/.test(c.w.document.getElementById("guard").textContent),"and the guardrail flags it");
 c=open({}); const d3=c.w.document.getElementById("refillDate");
 d3.value=back(25); d3.dispatchEvent(new c.w.Event("change",{bubbles:true}));
 ok(bars(c)[0]==="IR Supply Left=5/30","five days left");
-ok(/5 days.*left.*refill by/i.test(c.w.document.getElementById("guard").textContent.replace(/\s+/g," ")),
-   "warned before it runs out, not after");
+ok(/5 days.*left.*covers you through/i.test(c.w.document.getElementById("guard").textContent.replace(/\s+/g," ")),
+   "warned before the last covered day, not after");
 c=open({}); const d4=c.w.document.getElementById("refillDate");
 d4.value=TODAY; d4.dispatchEvent(new c.w.Event("change",{bubbles:true}));
 ok(bars(c).join("|")==="IR Supply Left=30/30|XR Supply Left=60/60","refilled today: full");
@@ -67,17 +67,12 @@ c=open({"dailyReadout.v1":JSON.stringify({
 ok(bars(c)[0]==="IR Supply Left=25/30","the most recent refill wins: "+bars(c)[0]);
 ok(c.w.document.getElementById("refillDate").value===back(5),"and the field shows it");
 
-console.log("\n-- Taken Today survived --");
-ok(c.w.document.querySelector("#supply .dosein"),"the doses field is still there");
-const t=c.w.document.querySelector("#supply .dosein");
-t.value="2"; t.dispatchEvent(new c.w.Event("input",{bubbles:true}));
-ok(store(c).irTaken===2,"and still records");
-
 console.log("\n-- the export --");
 c.w.document.getElementById("copyBtn").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
 setTimeout(()=>{
   const head=copied.split("\n")[0];
   ok(/Refill Date/.test(head)&&/IR Days Left/.test(head)&&/XR Days Left/.test(head),"new columns");
+  ok(!/IR Taken/.test(head),"and no Taken column");
   ok(!/IR Refill|IR Left,/.test(head),"old pack columns gone");
   const line=copied.split("\n").find(l=>l.indexOf(back(5))===0)||"";
   ok(line.indexOf(back(5))>=0,"the refill date is in the row");
