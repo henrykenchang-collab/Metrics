@@ -16,6 +16,7 @@ Claude Artifact. One page, no build tooling beyond a single Python script.
 | `tools/oura_auth.py` | OAuth2 against Oura, run on your own machine |
 | `tools/oura_sync.py` | pulls sleep figures from an Oura ring into a seed |
 | `test/oura.test.py` | rules the puller must not break |
+| `test/meals.test.js` | the meals section, CPAP zeros, the weekend rule |
 | `test/oura_auth.test.py` | token cache: expiry, rotation, file mode |
 
 ```sh
@@ -79,6 +80,20 @@ again on the last day.
 
 `irTaken` and `irFill` are both gone from the interface. Days that carry them
 keep them in storage, unread — nothing written is ever deleted.
+
+## Defaults the app applies for you
+
+Three things get filled in on your behalf, and each is flagged so that undoing
+whatever summoned it takes it with it — a default must never be the thing that
+keeps an otherwise-empty day alive:
+
+- bed and wake (`_df`), cleared the moment you touch either
+- work productivity at the weekend, set to N/A (`_dw`), cleared the moment you
+  choose anything for it
+- an empty meal row, which is not stored at all until it has text
+
+`entered()` is the single place that knows the difference between something you
+put there and something the app assumed.
 
 ## Doses
 
