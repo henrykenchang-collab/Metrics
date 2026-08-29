@@ -17,7 +17,8 @@ function open(jar){ jar=jar||{};
 const row=(w,c)=>[...w.document.getElementById("rows").children]
   .find(b=>b.querySelector(".row-code").textContent===c);
 const tap=(w,c)=>row(w,c).dispatchEvent(new w.MouseEvent("click",{bubbles:true}));
-const segs=(w,i)=>[...w.document.getElementById("rates").children[i].querySelectorAll(".seg")];
+const segs=(w,i)=>[...w.document.getElementById("rates").children[i]
+  .querySelectorAll(".seg:not(.na-seg)")];
 
 console.log("\n== 1. default bed / wake ==");
 let c=open({});

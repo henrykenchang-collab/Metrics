@@ -270,7 +270,11 @@
   .rate-name { flex: 1; font-size: 14.5px; font-weight: 500; letter-spacing: -.01em; min-width: 0; }
   .rate-name .row-sub { display: block; font-size: 11px; color: var(--ink-3); font-weight: 400; }
   .meter { display: flex; gap: 5px; flex: none; }
-  .rate-row.scale .meter { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+  .rate-row.scale .meter { display: grid; grid-template-columns: repeat(8, 1fr) 1.35fr; gap: 4px; }
+  /* neutral, dashed, last: an opt-out rather than a ninth step, so it never
+     reads as "worse than 1" */
+  .na-seg { border-style: dashed; color: var(--ink-3); font-size: 9.5px; letter-spacing: .03em; }
+  .na-seg.on { background: var(--ink-3); border-color: var(--ink-3); color: var(--surface); border-style: solid; }
   .rate-row.scale .seg { width: auto; height: 34px; font-size: 11px; }
   .seg {
     width: 30px; height: 30px; border-radius: 8px;
@@ -647,6 +651,13 @@
      entry is already on the scale. */
   var SCALE = [1, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 
+  /* N/A is a statement, blank is a silence. "I was not working" and "I never
+     said" both belong out of the averages, but only one of them is something
+     you told the readout, and the month grid should show it as such. Stored as
+     a string so it can never be mistaken for a score. */
+  var NA = "na";
+  function ratingNum(v) { return typeof v === "number" ? v : null; }
+
   /* Three-way ratings. Single-select pills rather than a cumulative meter,
      since "Bad" filling one segment would read as a quantity. */
   var FLUENCY = [{ v: "bad", label: "Bad" }, { v: "avg", label: "Average" }, { v: "good", label: "Good" }];
@@ -691,7 +702,7 @@
     { label: "Energy",                 dp: 1, unit: "",     move: 0.5, good: "up",
       get: function (d) { return avgEnergy(d); } },
     { label: "Work Productivity",      dp: 1, unit: "",     move: 0.5, good: "up",
-      get: function (d) { return d.work || null; } },
+      get: function (d) { return ratingNum(d.work); } },
     { label: "Mood",                   dp: 1, unit: "",     move: 0.4, good: "up",
       get: function (d) { return d.mood ? FLU_N[d.mood] : null; } },
     { label: "Verbal Fluency",         dp: 1, unit: "",     move: 0.4, good: "up",
@@ -995,7 +1006,7 @@
     });
   });
 
-  var segNodes = {};
+  var segNodes = {}, naNodes = {};
   RATINGS.forEach(function (r) {
     var row = document.createElement("div");
     row.className = "rate-row scale";
@@ -1014,6 +1025,17 @@
       });
       meter.appendChild(b); segs.push(b);
     });
+
+    var naBtn = document.createElement("button");
+    naBtn.className = "seg na-seg"; naBtn.type = "button"; naBtn.textContent = "N/A";
+    naBtn.setAttribute("aria-label", r.name + (r.sub ? " " + r.sub : "") + ": not applicable");
+    naBtn.addEventListener("click", function () {
+      var d = day(cur);
+      if (d[r.key] === NA) delete d[r.key]; else d[r.key] = NA;
+      save(cur); render();
+    });
+    meter.appendChild(naBtn);
+    naNodes[r.key] = naBtn;
     row.appendChild(meter);
     $("rates").appendChild(row);
     segNodes[r.key] = segs;
@@ -1208,7 +1230,8 @@
   }
 
   function avgEnergy(d) {
-    var v = ENERGY.map(function (e) { return d[e.key]; }).filter(function (x) { return x > 0; });
+    var v = ENERGY.map(function (e) { return ratingNum(d[e.key]); })
+                  .filter(function (x) { return x > 0; });
     return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null;
   }
   function mean(a) { return a.reduce(function (x, y) { return x + y; }, 0) / a.length; }
@@ -1237,7 +1260,7 @@
     if (!d) return null;
     if (which === "energy") return avgEnergy(d);
     if (which === "mood") return d.mood ? FLU_N[d.mood] : null;
-    if (which === "work") return d.work || null;
+    if (which === "work") return ratingNum(d.work);
     return d.sleep === undefined ? null : d.sleep;
   }
   function esc(s) {
@@ -1525,11 +1548,14 @@
 
     RATINGS.forEach(function (r) {
       /* fill by position, not by value — the steps are not evenly spaced */
-      var idx = d[r.key] ? SCALE.indexOf(d[r.key]) : -1;
+      var val = d[r.key];
+      var idx = typeof val === "number" ? SCALE.indexOf(val) : -1;
       segNodes[r.key].forEach(function (s, i) {
         s.classList.toggle("on", i <= idx);
         s.setAttribute("aria-pressed", i === idx ? "true" : "false");
       });
+      naNodes[r.key].classList.toggle("on", val === NA);
+      naNodes[r.key].setAttribute("aria-pressed", val === NA ? "true" : "false");
     });
 
     CHOICE_ROWS.forEach(function (c) {
@@ -1578,7 +1604,7 @@
     if (d.hr !== undefined) chips.push('<span class="chip v"><span>HR</span><b>' + d.hr + '</b></span>');
     var ae = avgEnergy(d);
     if (ae !== null) chips.push('<span class="chip c"><span>ENG</span><b>' + ae.toFixed(1) + '</b></span>');
-    if (d.work) chips.push('<span class="chip c"><span>WRK</span><b>' + d.work + '/5</b></span>');
+    if (ratingNum(d.work)) chips.push('<span class="chip c"><span>WRK</span><b>' + d.work + '/5</b></span>');
     CHOICE_ROWS.forEach(function (c) {
       if (d[c.key]) chips.push('<span class="chip c"><span>' + c.code + '</span><b>' + choiceLabel(d[c.key]) + '</b></span>');
     });
@@ -1603,7 +1629,7 @@
     var y = function (v) { return padY + (H - padY * 2) * (1 - (v - 1) / 4); };
 
     var pts = ENERGY.map(function (e, i) {
-      var v = d[e.key];
+      var v = ratingNum(d[e.key]);
       return v ? { x: padX + stepX * i, y: y(v) } : null;
     });
     var have = pts.filter(Boolean);
@@ -1691,9 +1717,14 @@
        crowded the markers, which is what the grid is for. */
     html += '<div class="grid-rule"></div>';
     html += line("WRK", "var(--copper)", "c", function (d) {
-      return d.work ? { op: (0.3 + 0.14 * d.work).toFixed(2), t: d.work + "/5", n: d.work } : null; }, avg1);
+      if (d.work === NA) return { na: true, t: "not applicable" };
+      var v = ratingNum(d.work);
+      return v ? { op: (0.3 + 0.14 * v).toFixed(2), t: v + "/5", n: v } : null; }, avg1);
     html += line("ENG", "var(--copper)", "c", function (d) {
       var a = avgEnergy(d);
+      if (a === null && ENERGY.some(function (e) { return d[e.key] === NA; })) {
+        return { na: true, t: "not applicable" };
+      }
       return a ? { op: (0.3 + 0.14 * a).toFixed(2), t: a.toFixed(1) + "/5", n: a } : null; }, avg1);
     CHOICE_ROWS.forEach(function (c) {
       html += line(c.code, "var(--copper)", "c", function (d) {
@@ -1891,8 +1922,8 @@
         .concat([d.irTaken === undefined ? "" : d.irTaken,
                  d.irFill === undefined ? "" : d.irFill,
                  leftAfter(k)])
-        .concat(ENERGY.map(function (e) { return d[e.key] || ""; }))
-        .concat([d.work || ""])
+        .concat(ENERGY.map(function (e) { return d[e.key] === NA ? "N/A" : (d[e.key] || ""); }))
+        .concat([d.work === NA ? "N/A" : (d.work || "")])
         .concat(CHOICE_ROWS.map(function (c) { return choiceLabel(d[c.key]); }))
         .concat([d.changed || "", (d.tags || []).join("; ")])
         .map(q).join(","));
