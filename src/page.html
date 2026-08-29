@@ -221,27 +221,27 @@
   .tagsave { padding: 0 15px; border-radius: var(--r); background: var(--ink); color: var(--bg); font-size: 13px; font-weight: 600; }
 
   /* ---------------- sleep ---------------- */
-  .times { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 10px; padding: 14px 16px 4px; }
-  .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .times { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 10px; padding: 11px 16px 3px; }
+  .field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .field > .code { color: var(--ink-3); }
   .timein {
-    font-family: var(--mono); font-size: 17px; font-variant-numeric: tabular-nums;
-    width: 100%; padding: 8px 10px; color: var(--ink);
+    font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums;
+    width: 100%; padding: 6px 9px; color: var(--ink);
     background: var(--surface-2); border: 1px solid transparent; border-radius: var(--r);
-    -webkit-appearance: none; appearance: none; min-height: 38px;
+    -webkit-appearance: none; appearance: none; min-height: 33px;
   }
   .timein::-webkit-date-and-time-value { text-align: left; margin: 0; }
   .timein:focus { border-color: var(--violet); }
-  .span { text-align: center; padding-bottom: 9px; }
-  .span-v { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--violet); display: block; }
+  .span { text-align: center; padding-bottom: 7px; }
+  .span-v { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--violet); display: block; }
   .span-l { color: var(--ink-3); }
   /* an assumed night reads quieter than a measured one */
   .times.assumed .timein { color: var(--ink-3); }
   .times.assumed .span-v { color: var(--ink-3); }
 
-  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); margin-top: 14px; border-top: 1px solid var(--line); }
-  /* intake doses reuse the stat cell, in the accent hue */
-  .stats.act { margin-top: 0; border-top: 0; }
+  /* Four across in one row rather than two by two: the same four numbers in
+     half the height, which is most of what this panel was spending. */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); margin-top: 10px; border-top: 1px solid var(--line); }
 
   /* one line per dose, sized like a marker row rather than a stat cell */
   .doses { border-top: 1px solid var(--line); }
@@ -264,23 +264,20 @@
     -webkit-appearance: none; appearance: none;
   }
   .datein::-webkit-date-and-time-value { text-align: right; margin: 0; }
-  .stats.act .numin { color: var(--accent); }
-  .stats.act .gauge > i { background: var(--accent); }
-  .stats.act .timein:focus { border-color: var(--accent); }
-  .stat { background: var(--surface); padding: 11px 16px 12px; display: flex; flex-direction: column; gap: 6px; }
-  /* min-height keeps the four inputs aligned when a label wraps to two lines */
-  .stat-label { color: var(--ink-3); line-height: 1.35; min-height: 28px; }
-  .stat-in { display: flex; align-items: baseline; gap: 4px; }
+  .stat { background: var(--surface); padding: 8px 9px 9px; display: flex; flex-direction: column; gap: 4px; }
+  /* the short labels are one line each, so nothing needs reserving */
+  .stat-label { color: var(--ink-3); line-height: 1.3; }
+  .stat-in { display: flex; align-items: baseline; gap: 2px; }
   .numin {
     font-family: var(--mono); font-variant-numeric: tabular-nums;
-    font-size: 23px; font-weight: 700; letter-spacing: -.03em;
-    width: 3.4ch; padding: 0; color: var(--violet);
+    font-size: 18px; font-weight: 700; letter-spacing: -.03em;
+    width: 3.2ch; padding: 0; color: var(--violet);
     background: none; border: 0; -webkit-appearance: none; appearance: none;
   }
   .numin::placeholder { color: var(--line-2); }
   .numin:focus { outline-offset: 4px; }
-  .stat-unit { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
-  .gauge { height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+  .stat-unit { font-family: var(--mono); font-size: 9.5px; color: var(--ink-3); }
+  .gauge { height: 3px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
   .gauge > i { display: block; height: 100%; width: 0; background: var(--violet); border-radius: 2px; transition: width .3s cubic-bezier(.2,.7,.3,1); }
 
   /* ---------------- energy ---------------- */
@@ -506,6 +503,7 @@
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
   @media (max-width: 359px) {
+    .stats { grid-template-columns: 1fr 1fr; }
     .seg { width: 26px; height: 26px; }
     .rate-row { gap: 6px; }
     .rate-row.scale .seg { width: auto; height: 30px; font-size: 10px; }
@@ -680,11 +678,14 @@
 
   var DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+  /* `short` is what the cell shows. The four sit in one row now, so a label
+     that wraps costs every cell a second line — and "Heart Rate Variability"
+     wrapped. `label` still goes to the export and the screen reader. */
   var STATS = [
-    { key: "sleep", label: "Sleep Score",            min: 0,  max: 100, unit: "/100" },
-    { key: "cpap",  label: "CPAP Score",             min: 0,  max: 100, unit: "/100" },
-    { key: "hrv",   label: "Heart Rate Variability", min: 0,  max: 100, unit: "ms" },
-    { key: "hr",    label: "Heart Rate",             min: 35, max: 125, unit: "bpm" }
+    { key: "sleep", label: "Sleep Score",            short: "Sleep",   min: 0,  max: 100, unit: "/100" },
+    { key: "cpap",  label: "CPAP Score",             short: "CPAP",    min: 0,  max: 100, unit: "/100" },
+    { key: "hrv",   label: "Heart Rate Variability", short: "HRV",     min: 0,  max: 100, unit: "ms" },
+    { key: "hr",    label: "Heart Rate",             short: "Rest HR", min: 35, max: 125, unit: "bpm" }
   ];
 
   /* Quantified intakes — same family as the markers (things you take),
@@ -1058,7 +1059,7 @@
         '<input class="dosein" type="text" inputmode="numeric" placeholder="––" maxlength="4" ' +
           'aria-label="' + s.label + ' (' + s.min + ' to ' + s.max + ')">' +
         '<span class="dose-unit">' + s.unit + '</span>'
-      : '<span class="code stat-label">' + s.label + '</span>' +
+      : '<span class="code stat-label">' + (s.short || s.label) + '</span>' +
         '<span class="stat-in"><input class="numin" type="text" inputmode="numeric" placeholder="––" maxlength="3" ' +
           'aria-label="' + s.label + ' (' + s.min + ' to ' + s.max + ')"><span class="stat-unit">' + s.unit + '</span></span>' +
         '<span class="gauge"><i></i></span>';
