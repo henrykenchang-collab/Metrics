@@ -13,6 +13,7 @@ Claude Artifact. One page, no build tooling beyond a single Python script.
 | `test/roundtrip.test.js` | jsdom tests, mostly guarding the self-republish |
 | `test/supply.test.js` | jsdom tests for the IR pack arithmetic |
 | `.claude/commands/oura-sync.md` | `/oura-sync` — the whole pull-and-publish loop |
+| `tools/cpap_import.py` | a sleep therapy report PDF into CPAP scores |
 | `tools/oura_auth.py` | OAuth2 against Oura, run on your own machine |
 | `tools/oura_sync.py` | pulls sleep figures from an Oura ring into a seed |
 | `test/oura.test.py` | rules the puller must not break |
@@ -94,6 +95,17 @@ keeps an otherwise-empty day alive:
 
 `entered()` is the single place that knows the difference between something you
 put there and something the app assumed.
+
+## CPAP
+
+The therapy report has no score of its own — its columns are usage time,
+pressure, AHI, P95, CAI and leak. The score is derived: a night's usage against
+a four-hour target, capped at 100, with an unused night scoring 0. That
+definition lives in `tools/cpap_import.py` and nowhere else, so changing it
+moves the whole history together instead of splitting it into two meanings.
+
+A zero draws red in the month grid, because a night the machine went unused is
+the one CPAP value worth seeing across a month.
 
 ## Doses
 

@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""Read a sleep therapy report PDF into Daily Readout CPAP scores.
+
+    python3 tools/cpap_import.py report.pdf --seed live-seed.json --out merged.json
+
+The report carries no score of its own -- its columns are usage time, pressure,
+AHI, P95, CAI and leak -- so the score is DERIVED here: a night's usage against
+a four-hour target, capped at 100. A night the machine went unused scores 0.
+That definition lives in this file and nowhere else; change it here and the
+whole history moves together rather than splitting into two meanings.
+
+Days the report does not cover are left exactly as they are. Everything else
+already on a covered day is preserved; only `cpap` is written.
+
+Needs pypdf. The system cryptography package can be broken, in which case:
+    python3 -m venv env && ./env/bin/pip install pypdf
+"""
+import argparse, io, json, re, sys, time
+
+ROW = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2})\s+(\d{1,2}):(\d{2})\s+"
+                 r"([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+CPAP")
+TARGET_MIN = 240          # the four-hour compliance bar the score is built on
+
+
+def nights(pdf_path):
+    from pypdf import PdfReader
+    out = {}
+    for page in PdfReader(pdf_path).pages:
+        for line in (page.extract_text() or "").split("\n"):
+            m = ROW.match(line.strip())
+            if not m:
+                continue
+            mo, dd, yy, hh, mi = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
+            out["20%s-%02d-%02d" % (yy, int(mo), int(dd))] = {
+                "usedMin": int(hh) * 60 + int(mi),
+                "ahi": float(m.group(7)), "leak": float(m.group(10)),
+            }
+    return out
+
+
+def score(used_min):
+    return min(100, int(round(used_min / float(TARGET_MIN) * 100)))
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("pdf")
+    ap.add_argument("--seed", required=True, help="the tracker's current seed JSON")
+    ap.add_argument("--out", help="where to write the merged seed")
+    ap.add_argument("--write", action="store_true")
+    args = ap.parse_args()
+
+    data = nights(args.pdf)
+    if not data:
+        sys.exit("no nightly rows found — is this the usage report, or a summary only?")
+
+    seed = json.load(io.open(args.seed, encoding="utf-8"))
+    days = seed.setdefault("days", {})
+    now = int(time.time() * 1000)
+    made = changed = 0
+
+    for k in sorted(data):
+        s = score(data[k]["usedMin"])
+        d = days.get(k)
+        if d is None:
+            days[k] = {"cpap": s, "_t": now}
+            made += 1
+        elif d.get("cpap") != s:
+            print("  %s  %s -> %s" % (k, d.get("cpap", "—"), s))
+            d["cpap"] = s
+            d["_t"] = now
+            changed += 1
+
+    used = [k for k in data if data[k]["usedMin"] > 0]
+    print("%d nights, %s to %s" % (len(data), min(data), max(data)))
+    print("  %d used, %d not; %d at or above four hours"
+          % (len(used), len(data) - len(used), len([k for k in used if data[k]["usedMin"] >= TARGET_MIN])))
+    print("  %d days created, %d rescored" % (made, changed))
+
+    if args.out and args.write:
+        json.dump(seed, io.open(args.out, "w", encoding="utf-8"), separators=(",", ":"))
+        print("wrote %s (%d days)" % (args.out, len(days)))
+    else:
+        print("(dry run — pass --out FILE --write to apply)")
+
+
+if __name__ == "__main__":
+    main()
