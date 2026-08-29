@@ -273,6 +273,15 @@
   .rate-row.scale .meter { display: grid; grid-template-columns: repeat(8, 1fr) 1.35fr; gap: 4px; }
   /* neutral, dashed, last: an opt-out rather than a ninth step, so it never
      reads as "worse than 1" */
+  .ratenote {
+    width: 100%; font: inherit; font-size: 13px; padding: 6px 10px;
+    color: var(--ink); background: var(--surface-2);
+    border: 1px solid transparent; border-radius: 8px;
+    -webkit-appearance: none; appearance: none;
+  }
+  .ratenote::placeholder { color: var(--ink-3); }
+  .ratenote:focus { border-color: var(--copper); }
+
   .na-seg { border-style: dashed; color: var(--ink-3); font-size: 9.5px; letter-spacing: .03em; }
   .na-seg.on { background: var(--ink-3); border-color: var(--ink-3); color: var(--surface); border-style: solid; }
   .rate-row.scale .seg { width: auto; height: 34px; font-size: 11px; }
@@ -656,6 +665,10 @@
      you told the readout, and the month grid should show it as such. Stored as
      a string so it can never be mistaken for a score. */
   var NA = "na";
+  /* "Energy" over "Pre-Work AM" was two lines saying one thing. One line, and
+     the space goes to a note instead — a score on its own rarely says why. */
+  function ratingLabel(r) { return r.name + (r.sub ? ": " + r.sub : ""); }
+  function noteKey(r) { return r.key + "Note"; }
   function ratingNum(v) { return typeof v === "number" ? v : null; }
 
   /* Three-way ratings. Single-select pills rather than a cumulative meter,
@@ -1006,18 +1019,18 @@
     });
   });
 
-  var segNodes = {}, naNodes = {};
+  var segNodes = {}, naNodes = {}, noteNodes = {};
   RATINGS.forEach(function (r) {
     var row = document.createElement("div");
     row.className = "rate-row scale";
-    row.innerHTML = '<span class="rate-name">' + r.name + (r.sub ? '<span class="row-sub">' + r.sub + '</span>' : '') + '</span>';
+    row.innerHTML = '<span class="rate-name">' + esc(ratingLabel(r)) + '</span>';
     var meter = document.createElement("div");
     meter.className = "meter";
     var segs = [];
     SCALE.forEach(function (n) {
       var b = document.createElement("button");
       b.className = "seg"; b.type = "button"; b.textContent = String(n);
-      b.setAttribute("aria-label", r.name + (r.sub ? " " + r.sub : "") + ": " + n + " out of 5");
+      b.setAttribute("aria-label", ratingLabel(r) + ": " + n + " out of 5");
       b.addEventListener("click", function () {
         var d = day(cur);
         if (d[r.key] === n) delete d[r.key]; else d[r.key] = n;
@@ -1028,7 +1041,7 @@
 
     var naBtn = document.createElement("button");
     naBtn.className = "seg na-seg"; naBtn.type = "button"; naBtn.textContent = "N/A";
-    naBtn.setAttribute("aria-label", r.name + (r.sub ? " " + r.sub : "") + ": not applicable");
+    naBtn.setAttribute("aria-label", ratingLabel(r) + ": not applicable");
     naBtn.addEventListener("click", function () {
       var d = day(cur);
       if (d[r.key] === NA) delete d[r.key]; else d[r.key] = NA;
@@ -1037,6 +1050,22 @@
     meter.appendChild(naBtn);
     naNodes[r.key] = naBtn;
     row.appendChild(meter);
+
+    /* Written straight through on each keystroke rather than debounced: the
+       text lands on the day it was typed on, so navigating away mid-sentence
+       cannot file it under the wrong date. The publish is already debounced. */
+    var note = document.createElement("input");
+    note.className = "ratenote"; note.type = "text"; note.maxLength = 120;
+    note.placeholder = "Optional note";
+    note.setAttribute("aria-label", ratingLabel(r) + ": note");
+    note.addEventListener("input", function () {
+      var d = day(cur), v = note.value.trim();
+      if (v) d[noteKey(r)] = note.value; else delete d[noteKey(r)];
+      save(cur);
+    });
+    row.appendChild(note);
+    noteNodes[r.key] = note;
+
     $("rates").appendChild(row);
     segNodes[r.key] = segs;
   });
@@ -1556,6 +1585,8 @@
       });
       naNodes[r.key].classList.toggle("on", val === NA);
       naNodes[r.key].setAttribute("aria-pressed", val === NA ? "true" : "false");
+      var nn = noteNodes[r.key];
+      if (nn !== document.activeElement) nn.value = d[noteKey(r)] || "";
     });
 
     CHOICE_ROWS.forEach(function (c) {
@@ -1906,6 +1937,7 @@
       .concat(["IR Taken", "IR Refill", "IR Left"])
       .concat(ENERGY.map(function (e) { return "Energy " + e.sub; }))
       .concat(["Work Productivity"])
+      .concat(RATINGS.map(function (r) { return ratingLabel(r) + " Note"; }))
       .concat(CHOICE_ROWS.map(function (c) { return c.name; }))
       .concat(["What Changed", "Factors"]);
 
@@ -1924,6 +1956,7 @@
                  leftAfter(k)])
         .concat(ENERGY.map(function (e) { return d[e.key] === NA ? "N/A" : (d[e.key] || ""); }))
         .concat([d.work === NA ? "N/A" : (d.work || "")])
+        .concat(RATINGS.map(function (r) { return d[noteKey(r)] || ""; }))
         .concat(CHOICE_ROWS.map(function (c) { return choiceLabel(d[c.key]); }))
         .concat([d.changed || "", (d.tags || []).join("; ")])
         .map(q).join(","));
