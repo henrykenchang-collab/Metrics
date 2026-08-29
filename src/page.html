@@ -195,7 +195,7 @@
   .jfield > .code { color: var(--ink-3); }
   .notes {
     width: 100%; min-height: 84px; resize: none; padding: 6px 0 12px;
-    border: 0; background: transparent; font: inherit; font-size: 15px;
+    border: 0; background: transparent; font: inherit; font-size: 13.5px;
     color: var(--ink); line-height: 1.55; -webkit-appearance: none; appearance: none;
   }
   .notes::placeholder { color: var(--ink-3); }
@@ -281,8 +281,6 @@
   .gauge > i { display: block; height: 100%; width: 0; background: var(--violet); border-radius: 2px; transition: width .3s cubic-bezier(.2,.7,.3,1); }
 
   /* ---------------- energy ---------------- */
-  .curve { padding: 12px 16px 2px; }
-  .curve svg { width: 100%; height: 52px; display: block; overflow: visible; }
   .rate-row { display: flex; align-items: center; gap: 10px; padding: 9px 16px; border-top: 1px solid var(--line); }
   /* eight steps will not sit beside a label on a phone, so they get their own line */
   .rate-row.scale { flex-direction: column; align-items: stretch; gap: 7px; padding: 10px 16px 12px; }
@@ -468,6 +466,9 @@
   .bar > i.left { background: var(--accent); }
   .bar > i.left.low { background: var(--neg); }
   .pack-note { font-size: 12.5px; line-height: 1.45; color: var(--ink-2); }
+  .pack-week { font-size: 11.5px; line-height: 1.4; color: var(--ink-3); margin: 0; }
+  .pack-week b { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink-2); }
+  .pack-week.over b { color: var(--neg); }
   .pack-note b { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); }
   .pack-note.over b { color: var(--neg); }
 
@@ -573,8 +574,13 @@
   </section>
 
   <section class="panel">
+    <div class="panel-head"><span class="code">Meals</span><span class="code">What You Ate</span></div>
+    <div id="meals"></div>
+    <div class="mealadd"><button class="tag add" id="mealAdd" type="button">+ Add Meal</button></div>
+  </section>
+
+  <section class="panel">
     <div class="panel-head"><span class="code">Energy &amp; Focus</span><span class="code" style="color:var(--copper)">Self-Rated</span></div>
-    <div class="curve"><svg id="curve" viewBox="0 0 300 52" preserveAspectRatio="none" aria-hidden="true"></svg></div>
     <div id="rates"></div>
     <div id="choices"></div>
   </section>
@@ -583,12 +589,6 @@
     <div class="panel-head"><span class="code">Daily Markers</span><span class="code">Streak</span></div>
     <div id="rows"></div>
     <div class="doses" id="extras"></div>
-  </section>
-
-  <section class="panel">
-    <div class="panel-head"><span class="code">Meals</span><span class="code">What You Ate</span></div>
-    <div id="meals"></div>
-    <div class="mealadd"><button class="tag add" id="mealAdd" type="button">+ Add Meal</button></div>
   </section>
 
   <section class="panel">
@@ -1481,6 +1481,33 @@
   /* ---- IR supply ---- */
   function dayGap(a, b) { return Math.round((fromISO(b) - fromISO(a)) / 86400000); }
 
+  /* A dose taken early is not a dose lost: two on Monday and none on Saturday
+     is the same week. So the balance that matters runs Monday to Sunday, and
+     nothing is said while there are still days to offset it in — only when the
+     week is nearly out and the balance is still over. */
+  function weekStart(k) {
+    var d = dow(k);                       // 0 = Sunday
+    return shift(k, -(d === 0 ? 6 : d - 1));
+  }
+  /* Days AFTER today, since today's doses are already what produced the
+     balance — there is nothing left to decide about them. Sunday therefore
+     has none, and a week still over on Sunday is simply over. */
+  function weekDaysLeft(k) { return dayGap(k, shift(weekStart(k), 6)); }
+  var WEEK_TAIL = 2;                      // days left at which an overage is worth saying
+
+  /* Net against the usual for the week holding k, in the field's own units.
+     null when the week holds nothing to add up. */
+  function weekNet(k, key) {
+    var start = weekStart(k), today = todayISO(), sum = 0, has = false;
+    for (var i = 0; i < 7; i++) {
+      var j = shift(start, i);
+      if (j > today) break;
+      var v = data[j] && data[j][key];
+      if (typeof v === "number") { sum += v; has = true; }
+    }
+    return has ? sum : null;
+  }
+
   /* The refill in force is the last one recorded on or before today; editing
      today's therefore overrides an older entry, which is what correcting a
      date should do.
@@ -1508,6 +1535,20 @@
     return fromISO(k).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   }
 
+  function weekLine() {
+    var today = todayISO(), net = weekNet(today, "extraIr");
+    if (net === null) return "";
+    var left = weekDaysLeft(today), over = net > 0 && left <= WEEK_TAIL;
+    var tail = "";
+    if (net > 0) {
+      tail = left > 0
+        ? ' \u00b7 <b>' + left + '</b> ' + (left === 1 ? "day" : "days") + " to offset"
+        : " \u00b7 week over";
+    }
+    return '<p class="pack-week' + (over ? " over" : "") + '">This week <b>' +
+      (net > 0 ? "+" : "") + net + ' mg</b> against the usual' + tail + '</p>';
+  }
+
   function renderSupply() {
     var p = supplyState(), head = $("packHead"), host = $("packBody"), el = $("refillDate");
     if (el && el !== document.activeElement) el.value = (p && p.start) || "";
@@ -1516,7 +1557,7 @@
       head.textContent = "No Refill";
       host.innerHTML = '<p class="empty">Set a <b>Refill Date</b> above.<br>' +
         'A refill covers ' + IR_DAYS + ' days of IR and ' + XR_DAYS + ' of XR, ' +
-        'so the date is all this needs to count down from.</p>';
+        'so the date is all this needs to count down from.</p>' + weekLine();
       return;
     }
 
@@ -1550,6 +1591,7 @@
         '</div>' +
         '<p class="pack-note' + (p.ir.left <= LOW_DAYS || p.xr.left <= LOW_DAYS ? " over" : "") +
           '">' + note + '</p>' +
+        weekLine() +
       '</div>';
   }
 
@@ -1595,6 +1637,19 @@
                 (delta > 0 ? "+" : "−") + Math.abs(delta).toFixed(t.dp) + t.unit + ")."
       });
     });
+
+    /* A week that is still over with a day or two to run is worth flagging;
+       one that is over on Tuesday is not, because Saturday can still absorb it. */
+    var wkNet = weekNet(todayISO(), "extraIr"), wkLeft = weekDaysLeft(todayISO());
+    if (wkNet !== null && wkNet > 0 && wkLeft <= WEEK_TAIL) {
+      alerts.push({
+        name: "IR This Week",
+        detail: wkLeft === 0
+          ? "The week finished <b>+" + wkNet + " mg</b> above the usual."
+          : "<b>+" + wkNet + " mg</b> above the usual, with only <b>" + wkLeft +
+            (wkLeft === 1 ? " day" : " days") + "</b> left to offset it."
+      });
+    }
 
     var sp = supplyState();
     if (sp) {
@@ -1762,7 +1817,6 @@
     renderMeals();
     renderSpan();
     renderSummary();
-    renderCurve();
     renderSupply();
     renderGrid();
     renderPatterns();
@@ -1810,39 +1864,6 @@
       : done + " of " + due + " due markers done.";
     if (extra) note += " Plus " + extra + " off-schedule.";
     $("note").textContent = note;
-  }
-
-  function renderCurve() {
-    var d = data[cur] || {};
-    var W = 300, H = 52, padX = 14, padY = 7;
-    var stepX = (W - padX * 2) / (ENERGY.length - 1);
-    var y = function (v) { return padY + (H - padY * 2) * (1 - (v - 1) / 4); };
-
-    var pts = ENERGY.map(function (e, i) {
-      var v = ratingNum(d[e.key]);
-      return v ? { x: padX + stepX * i, y: y(v) } : null;
-    });
-    var have = pts.filter(Boolean);
-
-    var s = '<line x1="0" y1="' + y(3) + '" x2="' + W + '" y2="' + y(3) +
-            '" stroke="var(--line)" stroke-width="1" stroke-dasharray="2 4"/>';
-    if (have.length >= 2) {
-      var dd = have.map(function (p, i) { return (i ? "L" : "M") + p.x.toFixed(1) + " " + p.y.toFixed(1); }).join(" ");
-      s += '<path d="' + dd + " L" + have[have.length - 1].x.toFixed(1) + " " + (H - padY) +
-           " L" + have[0].x.toFixed(1) + " " + (H - padY) + ' Z" fill="var(--copper)" opacity=".12"/>';
-      s += '<path d="' + dd + '" fill="none" stroke="var(--copper)" stroke-width="2" stroke-linecap="round" ' +
-           'stroke-linejoin="round" vector-effect="non-scaling-stroke"/>';
-    }
-    ENERGY.forEach(function (e, i) {
-      var p = pts[i], cx = padX + stepX * i;
-      s += p
-        ? '<circle cx="' + cx + '" cy="' + p.y.toFixed(1) + '" r="3.2" fill="var(--copper)" stroke="var(--surface)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>'
-        : '<circle cx="' + cx + '" cy="' + y(3) + '" r="2" fill="var(--line-2)"/>';
-    });
-
-    var svg = $("curve");
-    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
-    svg.innerHTML = s;
   }
 
   /* ============================================================

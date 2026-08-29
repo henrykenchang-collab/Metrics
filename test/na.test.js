@@ -50,9 +50,6 @@ const chips=c.w.document.getElementById("chips").textContent;
 ok(/ENG3\.0|ENG.*3/.test(chips.replace(/\s/g,"")),"energy averages 5 and 1 to 3.0, ignoring the N/A: "+chips.replace(/\s+/g," ").trim());
 click(c.w,na(c.w,4));                 // work = N/A
 ok(!/WRK/.test(c.w.document.getElementById("chips").textContent),'no "na/5" chip for work');
-const path=c.w.document.getElementById("curve").innerHTML;
-ok(!/NaN/.test(path),"the energy curve has no NaN in it");
-ok((path.match(/<circle/g)||[]).length===4,"and still plots all four points");
 
 console.log("\n-- the month grid ghosts it --");
 c=open({"dailyReadout.v1":JSON.stringify({
