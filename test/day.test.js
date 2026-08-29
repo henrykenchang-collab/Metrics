@@ -46,10 +46,10 @@ console.log("\n-- nothing else moved --");
 c=open({},{});
 setTimeout(()=>{
   const sub=x=>[...c.w.document.getElementById("rows").children]
-    .find(b=>b.querySelector(".row-code").textContent===x).querySelector(".row-sub").textContent.trim();
+    .find(b=>b.querySelector(".row-code").textContent===x).querySelector(".row-sub").textContent.trim().replace(/^:\s*/,"");
   ok(sub("GRN")==="Sun · Mon · Wed","greens intact");
   ok(sub("SAU")==="Sun–Tue","sauna intact");
-  ok(c.w.document.getElementById("packHead").textContent==="No Pack","supply intact");
+  ok(c.w.document.getElementById("packHead").textContent==="No Refill","supply intact");
   ok(/body::before/.test(HTML),"corgi intact");
   console.log(fail?"\n"+fail+" FAILED":"\nall passed");
   process.exit(fail?1:0);

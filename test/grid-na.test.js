@@ -55,19 +55,19 @@ ok(sup.classList.contains("tight"),"without a second rule under the panel head")
 ok(sup.querySelectorAll(".doserow").length===2,"two rows");
 ok(!sup.querySelector(".gauge"),"no gauges");
 const names=[...sup.querySelectorAll(".dose-name")].map(e=>e.textContent);
-ok(names.join(" | ")==="Taken Today: | Refill:","shorter labels: "+names.join(" | "));
-const units=[...sup.querySelectorAll(".dose-unit")].map(e=>e.textContent);
-ok(units.join(",")==="doses,doses","units read doses");
-ok(/Taken Today/.test(c.w.document.getElementById("packBody").textContent),
-   "the empty state points at the new label");
+ok(names.join(" | ")==="Taken Today: | Refill Date:","labels: "+names.join(" | "));
+ok(sup.querySelectorAll(".dosein").length===1,"one number field");
+ok(sup.querySelectorAll(".datein").length===1,"and one date field");
+ok(/Refill Date/.test(c.w.document.getElementById("packBody").textContent),
+   "the empty state points at it");
 
 console.log("\n-- and still works --");
-const taken=sup.querySelectorAll(".dosein")[0], fill=sup.querySelectorAll(".dosein")[1];
-fill.value="30"; fill.dispatchEvent(new c.w.Event("input",{bubbles:true}));
+const taken=sup.querySelector(".dosein"), when=sup.querySelector(".datein");
+when.value="2026-08-20"; when.dispatchEvent(new c.w.Event("change",{bubbles:true}));
 taken.value="2"; taken.dispatchEvent(new c.w.Event("input",{bubbles:true}));
-ok(store(c).irFill===30&&store(c).irTaken===2,"both fields record");
-ok(c.w.document.getElementById("packHead").textContent==="Pack of 30","the pack reads");
-ok(/Doses Left/.test(c.w.document.getElementById("packBody").textContent),"and the readout renders");
+ok(store(c).irTaken===2&&store(c).refill==="2026-08-20","both fields record");
+ok(c.w.document.getElementById("packHead").textContent.indexOf("Refilled")===0,"the panel reads");
+ok(/Supply Left/.test(c.w.document.getElementById("packBody").textContent),"and the bars render");
 ok(c.w.document.getElementById("extras").querySelectorAll(".doserow").length===2,"Extra IR/XR unchanged");
 console.log(fail?"\n"+fail+" FAILED":"\nall passed");
 process.exit(fail?1:0);

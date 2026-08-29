@@ -48,15 +48,16 @@ ok(heads[heads.length-1]==="IR Supply","IR Supply is the last panel: "+heads.joi
 ok(heads.indexOf("Patterns")===heads.length-2,"and sits directly under Patterns");
 ok(!!c.w.document.getElementById("supply"),"its inputs came with it");
 
-c=open({"dailyReadout.v1":JSON.stringify({
-  [back(9)]:{irFill:30,irTaken:2,_t:1},[back(8)]:{irTaken:2,_t:1},[back(7)]:{irTaken:2,_t:1},
-  [back(6)]:{irTaken:2,_t:1},[back(5)]:{irTaken:2,_t:1},[back(4)]:{irTaken:2,_t:1},
-  [back(3)]:{irTaken:2,_t:1},[back(2)]:{irTaken:2,_t:1},[back(1)]:{irTaken:2,_t:1}})});
+c=open({});
+const dr=c.w.document.getElementById("refillDate");
+dr.value=back(12); dr.dispatchEvent(new c.w.Event("change",{bubbles:true}));
 const body=c.w.document.getElementById("packBody");
-ok(body.querySelectorAll(".pack-top .bar").length===0,"the redundant top bar is gone");
-ok(body.querySelectorAll(".pace-row").length===2,"the two comparison bars are what remain");
-ok(/Doses Left/.test(body.textContent)&&/a day/.test(body.textContent),"count and rate still read");
-ok(/runs out/.test(body.textContent),"the projection still reads");
-ok(c.w.document.getElementById("packHead").textContent==="Pack of 30","header still names the pack");
+ok(body.querySelectorAll(".pack-top").length===0,"the big score block is gone");
+ok(body.querySelectorAll(".pace-row").length===2,"two bars, one per drug");
+ok(/IR Supply Left/.test(body.textContent)&&/XR Supply Left/.test(body.textContent),
+   "they read IR and XR supply left");
+ok(/runs out/.test(body.textContent),"the run-out dates still read");
+ok(c.w.document.getElementById("packHead").textContent.indexOf("Refilled")===0,
+   "header names the refill date");
 console.log(fail?"\n"+fail+" FAILED":"\nall passed");
 process.exit(fail?1:0);

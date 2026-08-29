@@ -258,6 +258,12 @@
   }
   .dosein::placeholder { color: var(--line-2); }
   .dose-unit { flex: none; font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .datein {
+    font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums;
+    padding: 0; color: var(--accent); background: none; border: 0; text-align: right;
+    -webkit-appearance: none; appearance: none;
+  }
+  .datein::-webkit-date-and-time-value { text-align: right; margin: 0; }
   .stats.act .numin { color: var(--accent); }
   .stats.act .gauge > i { background: var(--accent); }
   .stats.act .timein:focus { border-color: var(--accent); }
@@ -431,15 +437,12 @@
      is going faster than a day at a time — that gap IS the finding, so it
      is what the panel draws. */
   .pack { display: flex; flex-direction: column; gap: 10px; padding: 11px 16px 12px; }
-  .pack-top { display: flex; align-items: center; gap: 14px; }
-  .pack-top .readout-meta { gap: 2px; }
   .pace { display: flex; flex-direction: column; gap: 6px; }
-  .pace-row { display: grid; grid-template-columns: 54px 1fr 42px; align-items: center; gap: 8px; }
+  .pace-row { display: grid; grid-template-columns: 88px 1fr 46px; align-items: center; gap: 8px; }
   .pace-l { color: var(--ink-3); }
   .pace-v { font-size: 10.5px; color: var(--ink-2); text-align: right; }
-  .bar > i.spent { background: var(--copper); }
-  .bar > i.spent.over { background: var(--neg); }
-  .bar > i.gone { background: var(--line-2); }
+  .bar > i.left { background: var(--accent); }
+  .bar > i.left.low { background: var(--neg); }
   .pack-note { font-size: 12.5px; line-height: 1.45; color: var(--ink-2); }
   .pack-note b { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); }
   .pack-note.over b { color: var(--neg); }
@@ -658,18 +661,14 @@
     { key: "extraXr", code: "XR", label: "Extra XR", min: 5, max: 40, unit: "mg" }
   ];
 
-  /* IR comes in a pack meant to last a day at a time, so the question is
-     never the raw count but the count against the days gone. `irFill` marks
-     the day a pack was opened and how many it held — a plain per-day field,
-     so a refill merges across devices like anything else and the history
-     keeps every pack rather than just the current one. */
-  var IR_RATE = 1;        // doses a day the pack is sized for
-  var IR_PACK = 30;       // default pack size, offered on the refill field
-  var IR_MIN_DAYS = 3;    // days into a pack before the guardrail will speak
+  /* What is left is a matter of the calendar, not of counting: a refill covers
+     a fixed run of days, so the date it happened is the only input needed. */
+  var IR_DAYS = 30;       // an IR refill covers this many days
+  var XR_DAYS = 60;       // an XR refill covers this many
+  var LOW_DAYS = 7;       // start saying so this close to the end
 
   var SUPPLY = [
-    { key: "irTaken", code: "IRT", label: "Taken Today", min: 0, max: 9,   unit: "doses" },
-    { key: "irFill",  code: "IRF", label: "Refill",      min: 0, max: 400, unit: "doses" }
+    { key: "irTaken", code: "IRT", label: "Taken Today", min: 0, max: 9, unit: "doses" }
   ];
 
   var ENERGY = [
@@ -995,6 +994,19 @@
   buildNumericFields(STATS, "stats");
   buildNumericFields(EXTRAS, "extras", true);
   buildNumericFields(SUPPLY, "supply", true);
+
+  (function () {
+    var wrap = document.createElement("label");
+    wrap.className = "doserow";
+    wrap.innerHTML = '<span class="dose-name">Refill Date:</span>' +
+                     '<input class="datein" type="date" id="refillDate" aria-label="Refill date">';
+    $("supply").appendChild(wrap);
+    wrap.querySelector("input").addEventListener("change", function () {
+      var d = day(cur);
+      if (this.value) d.refill = this.value; else delete d.refill;
+      save(cur); render();
+    });
+  })();
 
   /* `compact` renders a dose as one line — "Extra IR: 10 mg" — at the size of
      a marker row. A tall cell with a 23px number and a gauge was more furniture
@@ -1343,32 +1355,21 @@
   /* ---- IR supply ---- */
   function dayGap(a, b) { return Math.round((fromISO(b) - fromISO(a)) / 86400000); }
 
-  /* The open pack is the most recent refill on or before today; everything
-     taken since counts against it. Returns null until a pack is opened. */
-  function packState() {
-    var today = todayISO(), start = null, size = 0;
+  /* The refill in force is the last one recorded on or before today; editing
+     today's therefore overrides an older entry, which is what correcting a
+     date should do. Everything else is subtraction from the calendar. */
+  function supplyState() {
+    var today = todayISO(), start = null;
     Object.keys(data).sort().forEach(function (k) {
-      if (k <= today && data[k] && data[k].irFill > 0) { start = k; size = data[k].irFill; }
+      if (k <= today && data[k] && data[k].refill) start = data[k].refill;
     });
     if (!start) return null;
 
-    var taken = 0, elapsed = 0, k = start, guard = 0;
-    while (k <= today && guard++ < SCAN) {
-      taken += (data[k] && data[k].irTaken) || 0;
-      elapsed++;
-      k = shift(k, 1);
+    var gone = Math.max(0, dayGap(start, today));   // a future date is not negative supply
+    function run(span) {
+      return { left: Math.max(0, Math.min(span, span - gone)), span: span, out: shift(start, span) };
     }
-
-    var left = Math.max(0, size - taken);
-    var packDays = Math.max(1, Math.round(size / IR_RATE));
-    var pace = elapsed ? taken / elapsed : 0;
-    return {
-      start: start, size: size, taken: taken, left: left, over: Math.max(0, taken - size),
-      elapsed: elapsed, packDays: packDays, pace: pace,
-      ahead: taken - elapsed * IR_RATE,
-      dueKey: shift(start, packDays - 1),
-      outKey: pace > 0 ? shift(today, Math.ceil(left / pace)) : null
-    };
+    return { start: start, gone: gone, ir: run(IR_DAYS), xr: run(XR_DAYS) };
   }
 
   function shortDate(k) {
@@ -1376,60 +1377,44 @@
   }
 
   function renderSupply() {
-    var p = packState(), head = $("packHead"), host = $("packBody");
+    var p = supplyState(), head = $("packHead"), host = $("packBody"), el = $("refillDate");
+    if (el && el !== document.activeElement) el.value = (p && p.start) || "";
 
     if (!p) {
-      head.textContent = "No Pack";
-      host.innerHTML = '<p class="empty">No pack open yet.<br>Put the pack size in ' +
-        '<b>Refill</b> on the day you started it — ' + IR_PACK + ' is the usual — then log ' +
-        'each day under <b>Taken Today</b>.</p>';
+      head.textContent = "No Refill";
+      host.innerHTML = '<p class="empty">Set a <b>Refill Date</b> above.<br>' +
+        'A refill covers ' + IR_DAYS + ' days of IR and ' + XR_DAYS + ' of XR, ' +
+        'so the date is all this needs to count down from.</p>';
       return;
     }
 
-    head.textContent = "Pack of " + p.size;
-    var early = p.outKey ? dayGap(p.outKey, p.dueKey) : 0;
-    var spentPct = Math.min(100, p.taken / p.size * 100);
-    var gonePct = Math.min(100, p.elapsed / p.packDays * 100);
-    var over = p.ahead >= 0.5;
+    head.textContent = "Refilled " + shortDate(p.start);
+
+    function bar(label, r) {
+      var low = r.left <= LOW_DAYS;
+      return '<div class="pace-row"><span class="code pace-l">' + label + '</span>' +
+             '<div class="bar"><i class="left' + (low ? " low" : "") +
+               '" style="width:' + (r.left / r.span * 100).toFixed(1) + '%"></i></div>' +
+             '<span class="num pace-v">' + r.left + '/' + r.span + '</span></div>';
+    }
 
     var note;
-    if (p.left === 0) {
-      note = "The pack is <b>empty</b>" +
-        (p.over ? ", with <b>" + p.over + "</b> taken past it" : "") +
-        ". Log the next refill to start a new one.";
-    } else if (over) {
-      note = "Going at <b>" + p.pace.toFixed(1) + " a day</b>, not " + IR_RATE + ". At this rate the " +
-             "pack runs out <b>" + shortDate(p.outKey) + "</b>" +
-             (early >= 1 ? ", <b>" + early + " day" + (early === 1 ? "" : "s") + "</b> before a " +
-                           p.packDays + "-day pack should" : "") + ".";
-    } else if (p.ahead <= -0.5) {
-      note = "Going at <b>" + p.pace.toFixed(1) + " a day</b>, under " + IR_RATE + ". The pack should " +
-             "last past <b>" + shortDate(p.dueKey) + "</b>.";
+    if (p.ir.left === 0 && p.xr.left === 0) {
+      note = "Both ran out — <b>IR " + shortDate(p.ir.out) + "</b>, <b>XR " + shortDate(p.xr.out) + "</b>.";
+    } else if (p.ir.left === 0) {
+      note = "IR ran out <b>" + shortDate(p.ir.out) + "</b>. XR has <b>" + p.xr.left + " days</b>.";
     } else {
-      note = "On a " + IR_RATE + "-a-day pace. The pack lasts to <b>" + shortDate(p.dueKey) + "</b>.";
+      note = "IR runs out <b>" + shortDate(p.ir.out) + "</b> · XR <b>" + shortDate(p.xr.out) + "</b>.";
     }
 
     host.innerHTML =
       '<div class="pack">' +
-        '<div class="pack-top">' +
-          '<div class="score"><span class="score-n">' + p.left + '</span>' +
-            '<span class="score-d">/' + p.size + '</span></div>' +
-          '<div class="readout-meta">' +
-            '<span class="code readout-label">Doses Left</span>' +
-            '<span class="readout-note">Day ' + p.elapsed + ' of ' + p.packDays +
-              ' \u00b7 ' + p.pace.toFixed(1) + ' a day</span>' +
-          '</div>' +
-        '</div>' +
         '<div class="pace">' +
-          '<div class="pace-row"><span class="code pace-l">Pack Used</span>' +
-            '<div class="bar"><i class="spent' + (over ? " over" : "") +
-              '" style="width:' + spentPct.toFixed(1) + '%"></i></div>' +
-            '<span class="num pace-v">' + p.taken + '/' + p.size + '</span></div>' +
-          '<div class="pace-row"><span class="code pace-l">Days Gone</span>' +
-            '<div class="bar"><i class="gone" style="width:' + gonePct.toFixed(1) + '%"></i></div>' +
-            '<span class="num pace-v">' + p.elapsed + '/' + p.packDays + '</span></div>' +
+          bar("IR Supply Left", p.ir) +
+          bar("XR Supply Left", p.xr) +
         '</div>' +
-        '<p class="pack-note' + (over ? " over" : "") + '">' + note + '</p>' +
+        '<p class="pack-note' + (p.ir.left <= LOW_DAYS || p.xr.left <= LOW_DAYS ? " over" : "") +
+          '">' + note + '</p>' +
       '</div>';
   }
 
@@ -1476,22 +1461,20 @@
       });
     });
 
-    var pk = packState();
-    if (pk && pk.elapsed >= IR_MIN_DAYS) {
-      if (pk.left === 0) {
-        alerts.push({
-          name: "IR Supply",
-          detail: "The pack is <b>empty</b> on day <b>" + pk.elapsed + "</b> of " + pk.packDays +
-                  (pk.over ? ", with <b>" + pk.over + "</b> taken past it" : "") + "."
-        });
-      } else if (pk.outKey && dayGap(pk.outKey, pk.dueKey) >= 3) {
-        alerts.push({
-          name: "IR Supply",
-          detail: "<b>" + pk.left + " left</b> of " + pk.size + " at <b>" + pk.pace.toFixed(1) +
-                  " a day</b> — about <b>" + dayGap(pk.outKey, pk.dueKey) +
-                  " days</b> short of the " + pk.packDays + " the pack is meant to cover."
-        });
-      }
+    var sp = supplyState();
+    if (sp) {
+      [["IR", sp.ir], ["XR", sp.xr]].forEach(function (pair) {
+        var name = pair[0] + " Supply", r = pair[1];
+        if (r.left === 0) {
+          alerts.push({ name: name, detail: "Ran out on <b>" + shortDate(r.out) + "</b>." });
+        } else if (r.left <= LOW_DAYS) {
+          alerts.push({
+            name: name,
+            detail: "<b>" + r.left + (r.left === 1 ? " day" : " days") + "</b> left — refill by <b>" +
+                    shortDate(r.out) + "</b>."
+          });
+        }
+      });
     }
 
     /* Compliance, collapsed into one row — a line per lapsed marker
@@ -1953,17 +1936,15 @@
     v = v === undefined || v === null ? "" : String(v);
     return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
   }
-  /* doses left in the open pack at the end of day k — the column that makes
-     the export auditable without replaying it */
-  function leftAfter(k) {
-    var start = null, size = 0;
+  /* days of a given span still covered at the end of day k — the column that
+     makes the export auditable without replaying it */
+  function daysLeftAt(k, span) {
+    var start = null;
     Object.keys(data).sort().forEach(function (j) {
-      if (j <= k && data[j] && data[j].irFill > 0) { start = j; size = data[j].irFill; }
+      if (j <= k && data[j] && data[j].refill) start = data[j].refill;
     });
     if (!start) return "";
-    var taken = 0, j = start, guard = 0;
-    while (j <= k && guard++ < SCAN) { taken += (data[j] && data[j].irTaken) || 0; j = shift(j, 1); }
-    return Math.max(0, size - taken);
+    return Math.max(0, Math.min(span, span - Math.max(0, dayGap(start, k))));
   }
 
   function csv() {
@@ -1972,7 +1953,7 @@
       .concat(["Bed Time", "Wake Time", "Time in Bed"])
       .concat(STATS.map(function (s) { return s.label; }))
       .concat(EXTRAS.map(function (x) { return x.label + " (mg)"; }))
-      .concat(["IR Taken", "IR Refill", "IR Left"])
+      .concat(["IR Taken", "Refill Date", "IR Days Left", "XR Days Left"])
       .concat(ENERGY.map(function (e) { return "Energy " + e.sub; }))
       .concat(["Work Productivity"])
       .concat(RATINGS.map(function (r) { return ratingLabel(r) + " Note"; }))
@@ -1990,8 +1971,9 @@
         .concat(STATS.map(function (s) { return d[s.key] === undefined ? "" : d[s.key]; }))
         .concat(EXTRAS.map(function (x) { return d[x.key] === undefined ? "" : d[x.key]; }))
         .concat([d.irTaken === undefined ? "" : d.irTaken,
-                 d.irFill === undefined ? "" : d.irFill,
-                 leftAfter(k)])
+                 d.refill || "",
+                 daysLeftAt(k, IR_DAYS),
+                 daysLeftAt(k, XR_DAYS)])
         .concat(ENERGY.map(function (e) { return d[e.key] === NA ? "N/A" : (d[e.key] || ""); }))
         .concat([d.work === NA ? "N/A" : (d.work || "")])
         .concat(RATINGS.map(function (r) { return d[noteKey(r)] || ""; }))

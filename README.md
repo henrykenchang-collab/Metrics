@@ -62,51 +62,21 @@ Days merge one at a time, newest write per day winning (`_t` is the per-day
 stamp). Two devices working on different days never cost each other anything;
 the same day on two devices resolves to whichever was written last.
 
-## IR supply
+## IR and XR supply
 
-A pack is meant to last a dose a day, so the reading that matters is doses
-spent against days gone — the panel draws both bars against each other and the
-gap between them is the finding. `irFill` marks the day a pack was opened and
-how many it held; `irTaken` is that day's doses. The open pack is the most
-recent refill on or before today, which means history keeps every pack rather
-than only the current one, and a refill merges across devices like any other
-day. The guardrail speaks only once a pack is a few days old and only when the
-projection lands short — going under a dose a day is not a problem to flag.
+What is left is a matter of the calendar, not of counting: a refill covers a
+fixed run of days, so the date it happened is the only input. `refill` holds
+that date on the day it was entered, and the one in force is the last recorded
+on or before today — so editing today's corrects an older entry, which is what
+correcting a date should do.
 
-## Oura
+`IR_DAYS` is 30, `XR_DAYS` 60. The panel draws what is left of each against its
+span and names both run-out dates; the guardrail speaks at `LOW_DAYS` (7) and
+again at zero. `irTaken` still records the day's doses, but no longer drives the
+projection.
 
-`tools/oura_sync.py` folds a ring's nightly figures into a seed: sleep score,
-HRV, resting heart rate, and bed/wake times.
-
-**This runs on your laptop, not in a cloud session.** Oura retired Personal
-Access Tokens, so what you get now is an OAuth2 refresh token that Oura may
-rotate — and a rotated token needs somewhere durable to land. A cloud
-environment is the wrong home for it twice over: it has no secrets store, and
-its filesystem does not survive the session.
-
-```sh
-python3 tools/oura_auth.py login       # once — opens a browser
-python3 tools/oura_auth.py status      # what is cached, without printing it
-python3 tools/oura_sync.py --seed live-seed.json                  # dry run
-python3 tools/oura_sync.py --seed live-seed.json --out m.json --write
-```
-
-Tokens are cached in `~/.config/daily-readout/oura.json`, mode 600, outside the
-repo. Nothing prints a secret. An existing Personal Access Token still works if
-you have one: set `OURA_TOKEN` and the OAuth path is skipped.
-
-The two OAuth endpoints come from Oura's published documentation and have NOT
-been exercised — the machine this was written on cannot reach Oura. Both are
-overridable without touching code, and a wrong one produces a plain error:
-
-```sh
-export OURA_AUTH_URL=...  OURA_TOKEN_URL=...  OURA_SCOPES=...
-```
-
-The ring owns five fields and records which ones it wrote (`_o`). It will
-correct its own earlier numbers, and will never overwrite one entered by hand —
-if you typed a night in yourself, you meant it, and the run says out loud where
-it deferred to you.
+`irFill`, the old pack-size field, is gone from the interface. Days that carry
+one keep it in storage, unread — nothing written is ever deleted.
 
 ## Schedules
 
