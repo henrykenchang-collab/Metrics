@@ -98,14 +98,28 @@ put there and something the app assumed.
 
 ## CPAP
 
-The therapy report has no score of its own — its columns are usage time,
-pressure, AHI, P95, CAI and leak. The score is derived: a night's usage against
-a four-hour target, capped at 100, with an unused night scoring 0. That
-definition lives in `tools/cpap_import.py` and nowhere else, so changing it
-moves the whole history together instead of splitting it into two meanings.
+The therapy report prints no score, so it is rebuilt from React Health's
+published 100-point breakdown:
 
-A zero draws red in the month grid, because a night the machine went unused is
-the one CPAP value worth seeing across a month.
+| Component | Points | Full marks |
+| --- | --- | --- |
+| Usage time | 60 | past the 4-hour compliance minimum |
+| Mask seal (leak) | 20 | at minimal leak |
+| Respiratory (AHI) | 20 | below AHI 5 |
+
+Only usage is fully specified there. The other two say "deducted dynamically"
+and "under 5 events per hour" without naming where the deduction reaches zero,
+so those endpoints are **assumptions**: AHI zeroes at 30, the severe boundary,
+and leak at 40 L/min. Both are named constants at the top of
+`tools/cpap_import.py` and appear nowhere else, so moving one moves the whole
+history together rather than splitting it into two meanings.
+
+A night the machine went unused scores 0 outright. The report writes 0.0 into
+every column for those nights, and reading them literally would award full
+marks for a flawless AHI and a perfect seal on a machine nobody switched on.
+
+A zero draws red in the month grid, because a night unused is the one CPAP
+value worth seeing across a month.
 
 ## Doses
 

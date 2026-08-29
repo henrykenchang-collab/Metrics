@@ -3,11 +3,23 @@
 
     python3 tools/cpap_import.py report.pdf --seed live-seed.json --out merged.json
 
-The report carries no score of its own -- its columns are usage time, pressure,
-AHI, P95, CAI and leak -- so the score is DERIVED here: a night's usage against
-a four-hour target, capped at 100. A night the machine went unused scores 0.
-That definition lives in this file and nowhere else; change it here and the
-whole history moves together rather than splitting into two meanings.
+The report prints no score, so it is rebuilt here from React Health's published
+100-point breakdown:
+
+    Usage Time    60 pts   full marks past the 4-hour compliance minimum
+    Mask Seal     20 pts   full marks at minimal leak, falling as leak rises
+    Respiratory   20 pts   full marks below AHI 5, falling as AHI rises
+
+Only the usage component is fully specified by that breakdown. The other two
+say "deducted dynamically" and "under 5 events per hour" without naming where
+the deduction reaches zero, so those endpoints are ASSUMPTIONS, set below and
+nowhere else. AHI zeroes at 30 (the severe boundary) and leak at 40 L/min.
+Change them here and the whole history moves together rather than splitting
+into two meanings.
+
+A night the machine went unused scores 0 outright: the report writes 0.0 into
+every column for those nights, and a literal reading would hand out full marks
+for a flawless AHI and a perfect seal on a machine nobody switched on.
 
 Days the report does not cover are left exactly as they are. Everything else
 already on a covered day is preserved; only `cpap` is written.
@@ -19,7 +31,9 @@ import argparse, io, json, re, sys, time
 
 ROW = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2})\s+(\d{1,2}):(\d{2})\s+"
                  r"([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+CPAP")
-TARGET_MIN = 240          # the four-hour compliance bar the score is built on
+USAGE_PTS, USAGE_TARGET_MIN = 60, 240      # published: full marks past four hours
+AHI_PTS,  AHI_FULL, AHI_ZERO = 20, 5.0, 30.0    # full marks under 5; 30 is assumed
+LEAK_PTS, LEAK_FULL, LEAK_ZERO = 20, 10.0, 40.0 # full marks at or under 10; 40 is assumed
 
 
 def nights(pdf_path):
@@ -38,8 +52,27 @@ def nights(pdf_path):
     return out
 
 
-def score(used_min):
-    return min(100, int(round(used_min / float(TARGET_MIN) * 100)))
+def taper(value, full_at, zero_at, points):
+    """Full marks at or below `full_at`, none at or above `zero_at`, straight
+    line between. The shape the breakdown describes as deducted dynamically."""
+    if value <= full_at:
+        return float(points)
+    if value >= zero_at:
+        return 0.0
+    return points * (1.0 - (value - full_at) / float(zero_at - full_at))
+
+
+def parts(night):
+    if night["usedMin"] <= 0:
+        return 0.0, 0.0, 0.0          # nothing ran; the zeroed columns are placeholders
+    usage = USAGE_PTS * min(1.0, night["usedMin"] / float(USAGE_TARGET_MIN))
+    return (usage,
+            taper(night["ahi"], AHI_FULL, AHI_ZERO, AHI_PTS),
+            taper(night["leak"], LEAK_FULL, LEAK_ZERO, LEAK_PTS))
+
+
+def score(night):
+    return int(round(sum(parts(night))))
 
 
 def main():
@@ -60,7 +93,7 @@ def main():
     made = changed = 0
 
     for k in sorted(data):
-        s = score(data[k]["usedMin"])
+        s = score(data[k])
         d = days.get(k)
         if d is None:
             days[k] = {"cpap": s, "_t": now}
@@ -74,7 +107,8 @@ def main():
     used = [k for k in data if data[k]["usedMin"] > 0]
     print("%d nights, %s to %s" % (len(data), min(data), max(data)))
     print("  %d used, %d not; %d at or above four hours"
-          % (len(used), len(data) - len(used), len([k for k in used if data[k]["usedMin"] >= TARGET_MIN])))
+          % (len(used), len(data) - len(used),
+             len([k for k in used if data[k]["usedMin"] >= USAGE_TARGET_MIN])))
     print("  %d days created, %d rescored" % (made, changed))
 
     if args.out and args.write:
