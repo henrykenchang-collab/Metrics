@@ -241,7 +241,21 @@
 
   .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); margin-top: 14px; border-top: 1px solid var(--line); }
   /* intake doses reuse the stat cell, in the accent hue */
-  .stats.act { margin-top: 0; border-top: 1px solid var(--line); }
+  .stats.act { margin-top: 0; border-top: 0; }
+
+  /* one line per dose, sized like a marker row rather than a stat cell */
+  .doses { border-top: 1px solid var(--line); }
+  .doserow { display: flex; align-items: center; gap: 8px; padding: 9px 16px; border-bottom: 1px solid var(--line); }
+  .doserow:last-child { border-bottom: 0; }
+  .dose-name { flex: 1; font-size: 15px; font-weight: 500; letter-spacing: -.01em; }
+  .dosein {
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 15px; font-weight: 700; width: 3.6ch; text-align: right;
+    padding: 0; color: var(--accent); background: none; border: 0;
+    -webkit-appearance: none; appearance: none;
+  }
+  .dosein::placeholder { color: var(--line-2); }
+  .dose-unit { flex: none; font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
   .stats.act .numin { color: var(--accent); }
   .stats.act .gauge > i { background: var(--accent); }
   .stats.act .timein:focus { border-color: var(--accent); }
@@ -310,7 +324,7 @@
   .row-code { width: 34px; flex: none; color: var(--ink-3); transition: color .16s ease; }
   .row.on .row-code { color: var(--accent); }
   .row-name { flex: 1; font-size: 15px; font-weight: 500; letter-spacing: -.01em; }
-  .row-sub { display: block; font-size: 11.5px; color: var(--ink-3); font-weight: 400; letter-spacing: 0; }
+  .row-sub { font-size: 11.5px; color: var(--ink-3); font-weight: 400; letter-spacing: 0; }
   /* a marker that isn't due today: still tappable, visibly optional */
   .row.notdue .row-name { color: var(--ink-2); }
   .row.notdue .cell { border-style: dashed; }
@@ -530,7 +544,7 @@
   <section class="panel">
     <div class="panel-head"><span class="code">Daily Markers</span><span class="code">Streak</span></div>
     <div id="rows"></div>
-    <div class="stats act" id="extras"></div>
+    <div class="doses" id="extras"></div>
   </section>
 
   <section class="panel">
@@ -607,6 +621,7 @@
     { key: "plunge",   code: "CLD", name: "Cold Plunge", days: [0, 1, 2, 3, 4, 5] },
     { key: "run",      code: "RUN", name: "Run",         days: [0, 1, 2, 3, 4] },
     { key: "weights",  code: "WGT", name: "Weights",     days: [0, 1, 2, 5] },
+    { key: "gym",      code: "GYM", name: "Gym",         days: [0, 1, 4, 5] },
     // subDays overrides the target on given weekdays (0 = Sunday)
     { key: "read",     code: "RDG", name: "Read", sub: "15 Min",
       days: [0, 1, 2, 3, 4, 5],
@@ -802,7 +817,6 @@
     var target = (m.subDays && m.subDays[dow(k)]) || m.sub || "";
     return [target, scheduleText(m)].filter(Boolean).join(" · ");
   }
-  function hasSub(m) { return !!(m.sub || m.subDays || scheduleText(m)); }
 
   // fixed name for exports, pattern rows and alerts, where there is no single day
   function markerLabel(m) {
@@ -968,17 +982,24 @@
      ============================================================ */
   var statNodes = {};
   buildNumericFields(STATS, "stats");
-  buildNumericFields(EXTRAS, "extras");
+  buildNumericFields(EXTRAS, "extras", true);
   buildNumericFields(SUPPLY, "supply");
 
-  function buildNumericFields(list, hostId) { list.forEach(function (s) {
+  /* `compact` renders a dose as one line — "Extra IR: 10 mg" — at the size of
+     a marker row. A tall cell with a 23px number and a gauge was more furniture
+     than a milligram figure needs, and it sat next to eleven one-line markers. */
+  function buildNumericFields(list, hostId, compact) { list.forEach(function (s) {
     var wrap = document.createElement("label");
-    wrap.className = "stat";
-    wrap.innerHTML =
-      '<span class="code stat-label">' + s.label + '</span>' +
-      '<span class="stat-in"><input class="numin" type="text" inputmode="numeric" placeholder="––" maxlength="3" ' +
-        'aria-label="' + s.label + ' (' + s.min + ' to ' + s.max + ')"><span class="stat-unit">' + s.unit + '</span></span>' +
-      '<span class="gauge"><i></i></span>';
+    wrap.className = compact ? "doserow" : "stat";
+    wrap.innerHTML = compact
+      ? '<span class="dose-name">' + s.label + ':</span>' +
+        '<input class="dosein" type="text" inputmode="numeric" placeholder="––" maxlength="3" ' +
+          'aria-label="' + s.label + ' (' + s.min + ' to ' + s.max + ')">' +
+        '<span class="dose-unit">' + s.unit + '</span>'
+      : '<span class="code stat-label">' + s.label + '</span>' +
+        '<span class="stat-in"><input class="numin" type="text" inputmode="numeric" placeholder="––" maxlength="3" ' +
+          'aria-label="' + s.label + ' (' + s.min + ' to ' + s.max + ')"><span class="stat-unit">' + s.unit + '</span></span>' +
+        '<span class="gauge"><i></i></span>';
     var input = wrap.querySelector("input"), fill = wrap.querySelector(".gauge > i");
 
     input.addEventListener("focus", function () { input.select(); });
@@ -1006,6 +1027,7 @@
   }); }
 
   function paintGauge(s, fill, v) {
+    if (!fill) return;                       // a compact dose row has no gauge
     fill.style.width = (v === null || v === undefined ? 0
       : Math.min(100, Math.max(0, (v - s.min) / (s.max - s.min) * 100))) + "%";
   }
@@ -1102,7 +1124,7 @@
     b.setAttribute("aria-pressed", "false");
     b.innerHTML =
       '<span class="code row-code">' + m.code + '</span>' +
-      '<span class="row-name">' + m.name + (hasSub(m) ? '<span class="row-sub"></span>' : '') + '</span>' +
+      '<span class="row-name">' + esc(m.name) + '<span class="row-sub"></span></span>' +
       '<span class="streak zero num">0d</span>' +
       '<span class="cell"><svg viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.2 5.2L20 7"/></svg></span>';
     b.addEventListener("click", function () {
@@ -1542,8 +1564,10 @@
       node.classList.toggle("notdue", !due);
       node.setAttribute("aria-pressed", on ? "true" : "false");
 
-      var subEl = node.querySelector(".row-sub");
-      if (subEl) subEl.textContent = markerSub(m, cur);   // target can vary by weekday
+      /* the schedule rides on the name rather than under it; still quieter
+         than the name, since it is a qualifier and not the thing itself */
+      var tail = markerSub(m, cur);                       // target can vary by weekday
+      node.querySelector(".row-sub").textContent = tail ? ": " + tail : "";
 
       var tag = node.querySelector(".streak");
       if (!due) {

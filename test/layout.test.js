@@ -14,7 +14,7 @@ function open(jar){jar=jar||{};
 }
 const sub=(w,c)=>{const r=[...w.document.getElementById("rows").children]
   .find(b=>b.querySelector(".row-code").textContent===c);
-  const s=r.querySelector(".row-sub"); return s?s.textContent.trim():null;};
+  const s=r.querySelector(".row-sub"); return s&&s.textContent?s.textContent.trim().replace(/^:\s*/,""):null;};
 
 console.log("\n== 1. Read skips Saturday ==");
 let c=open({});
