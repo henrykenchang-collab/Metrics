@@ -241,7 +241,7 @@
 
   .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); margin-top: 14px; border-top: 1px solid var(--line); }
   /* intake doses reuse the stat cell, in the accent hue */
-  .stats.act { margin-top: 0; border-top: 0; }
+  .stats.act { margin-top: 0; border-top: 1px solid var(--line); }
   .stats.act .numin { color: var(--accent); }
   .stats.act .gauge > i { background: var(--accent); }
   .stats.act .timein:focus { border-color: var(--accent); }
@@ -393,16 +393,17 @@
      the pack. Whenever the top bar runs ahead of the bottom one, the pack
      is going faster than a day at a time — that gap IS the finding, so it
      is what the panel draws. */
-  .pack { display: flex; flex-direction: column; gap: 13px; padding: 13px 16px 14px; }
-  .pack-top { display: flex; align-items: center; gap: 18px; }
-  .pace { display: flex; flex-direction: column; gap: 8px; }
-  .pace-row { display: grid; grid-template-columns: 58px 1fr 44px; align-items: center; gap: 9px; }
+  .pack { display: flex; flex-direction: column; gap: 10px; padding: 11px 16px 12px; }
+  .pack-top { display: flex; align-items: center; gap: 14px; }
+  .pack-top .readout-meta { gap: 2px; }
+  .pace { display: flex; flex-direction: column; gap: 6px; }
+  .pace-row { display: grid; grid-template-columns: 54px 1fr 42px; align-items: center; gap: 8px; }
   .pace-l { color: var(--ink-3); }
   .pace-v { font-size: 10.5px; color: var(--ink-2); text-align: right; }
   .bar > i.spent { background: var(--copper); }
   .bar > i.spent.over { background: var(--neg); }
   .bar > i.gone { background: var(--line-2); }
-  .pack-note { font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+  .pack-note { font-size: 12.5px; line-height: 1.45; color: var(--ink-2); }
   .pack-note b { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); }
   .pack-note.over b { color: var(--neg); }
 
@@ -516,14 +517,7 @@
   <section class="panel">
     <div class="panel-head"><span class="code">Daily Markers</span><span class="code">Streak</span></div>
     <div id="rows"></div>
-    <div class="panel-head sub"><span class="code">Extras</span><span class="code">Leave Blank if None</span></div>
     <div class="stats act" id="extras"></div>
-  </section>
-
-  <section class="panel">
-    <div class="panel-head"><span class="code">IR Supply</span><span class="code" id="packHead">No Pack</span></div>
-    <div class="stats act" id="supply"></div>
-    <div id="packBody"></div>
   </section>
 
   <section class="panel">
@@ -556,6 +550,12 @@
       <div class="switch" id="timing" role="group" aria-label="When the Effect Is Measured"></div>
     </div>
     <div id="facts"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><span class="code">IR Supply</span><span class="code" id="packHead">No Pack</span></div>
+    <div class="stats act" id="supply"></div>
+    <div id="packBody"></div>
   </section>
 
   <div class="syncbar">
@@ -596,6 +596,7 @@
     { key: "weights",  code: "WGT", name: "Weights",     days: [0, 1, 2, 5] },
     // subDays overrides the target on given weekdays (0 = Sunday)
     { key: "read",     code: "RDG", name: "Read", sub: "15 Min",
+      days: [0, 1, 2, 3, 4, 5],
       subDays: { 0: "30 Min" }, label: "Read (15/30 Min)" },
     { key: "th",       code: "TH",  name: "TH" },
     { key: "yt",       code: "YT",  name: "YT" },
@@ -1329,7 +1330,6 @@
             '<span class="score-d">/' + p.size + '</span></div>' +
           '<div class="readout-meta">' +
             '<span class="code readout-label">Doses Left</span>' +
-            '<div class="bar"><i style="width:' + (100 - spentPct).toFixed(1) + '%"></i></div>' +
             '<span class="readout-note">Day ' + p.elapsed + ' of ' + p.packDays +
               ' \u00b7 ' + p.pace.toFixed(1) + ' a day</span>' +
           '</div>' +
@@ -1685,21 +1685,10 @@
       }, function (v) { return dueDays ? v.length + "/" + dueDays : ""; });
     });
 
-    html += '<div class="grid-rule"></div>';
-    EXTRAS.forEach(function (x) {
-      html += line(x.code, null, "on", function (d) {
-        var v = d[x.key];
-        if (v === undefined) return null;
-        return { op: (0.32 + 0.68 * (v - x.min) / (x.max - x.min)).toFixed(2), t: v + " mg", n: v };
-      }, avg1);
-    });
-
-    html += line("IRT", null, "on", function (d) {
-      var v = d.irTaken;
-      if (v === undefined) return null;
-      return { op: (0.3 + 0.7 * Math.min(1, v / 3)).toFixed(2), t: v + " doses", n: v };
-    }, avg1);
-
+    /* Doses are deliberately absent from this grid. IR, XR and the pack count
+       are quantities against a target, which the supply panel already reads
+       properly; as opacity ramps in a row of squares they said very little and
+       crowded the markers, which is what the grid is for. */
     html += '<div class="grid-rule"></div>';
     html += line("WRK", "var(--copper)", "c", function (d) {
       return d.work ? { op: (0.3 + 0.14 * d.work).toFixed(2), t: d.work + "/5", n: d.work } : null; }, avg1);
