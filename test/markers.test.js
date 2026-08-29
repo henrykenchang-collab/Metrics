@@ -66,8 +66,8 @@ ok(store(c).extraIr===40,"and still clamps to the 5-40 range on blur");
 
 console.log("\n-- the supply panel kept its tall cells --");
 const sup=c.w.document.getElementById("supply");
-ok(sup.classList.contains("stats"),"IR Supply still uses stat cells");
-ok(sup.querySelectorAll(".gauge").length===2,"gauges intact there");
+ok(sup.classList.contains("doses"),"IR Supply now uses the same one-line rows");
+ok(!sup.querySelector(".gauge"),"its gauges are gone with them");
 ok(!/NaN/.test(c.w.document.getElementById("grid").innerHTML),"grid clean");
 
 console.log("\n-- existing dose history still reads --");

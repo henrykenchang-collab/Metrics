@@ -245,6 +245,8 @@
 
   /* one line per dose, sized like a marker row rather than a stat cell */
   .doses { border-top: 1px solid var(--line); }
+  /* directly under a panel head, which already draws the line */
+  .doses.tight { border-top: 0; }
   .doserow { display: flex; align-items: center; gap: 8px; padding: 9px 16px; border-bottom: 1px solid var(--line); }
   .doserow:last-child { border-bottom: 0; }
   .dose-name { flex: 1; font-size: 15px; font-weight: 500; letter-spacing: -.01em; }
@@ -381,6 +383,14 @@
   .sq.future { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
   /* not on this marker's schedule — a ghost, so it never reads as a miss */
   .sq.na { background: var(--surface-2); opacity: .3; }
+  /* you said it did not apply: the strongest ink there is, so it separates at a
+     glance from done, missed and never-scheduled. --ink rather than a literal
+     black, or it would vanish into the dark theme's own near-black ground. */
+  .sq.napp {
+    background: var(--ink); color: var(--surface);
+    display: grid; place-items: center;
+    font-family: var(--mono); font-size: 6px; font-weight: 700; letter-spacing: -.03em;
+  }
   .grid-axis { display: flex; align-items: center; gap: 3px; margin-top: 3px; }
   .axis-tick { width: 13px; flex: none; text-align: center; font-family: var(--mono); font-size: 8.5px; color: var(--ink-3); }
   .axis-tick.now { color: var(--accent); font-weight: 700; }
@@ -565,6 +575,7 @@
       <span class="code"><i style="background:var(--copper)"></i>Self-Rated</span>
       <span class="code"><i style="background:var(--violet)"></i>Measured</span>
       <span class="code"><i style="background:var(--neg)"></i>Missed</span>
+      <span class="code"><i style="background:var(--ink)"></i>N/A</span>
       <span class="code"><i class="ghost"></i>Not Scheduled</span>
     </div>
     <p class="gridnote" id="gridnote"></p>
@@ -581,7 +592,7 @@
 
   <section class="panel">
     <div class="panel-head"><span class="code">IR Supply</span><span class="code" id="packHead">No Pack</span></div>
-    <div class="stats act" id="supply"></div>
+    <div class="doses tight" id="supply"></div>
     <div id="packBody"></div>
   </section>
 
@@ -657,8 +668,8 @@
   var IR_MIN_DAYS = 3;    // days into a pack before the guardrail will speak
 
   var SUPPLY = [
-    { key: "irTaken", code: "IRT", label: "IR Taken Today", min: 0, max: 9,   unit: "doses" },
-    { key: "irFill",  code: "IRF", label: "Refill — New Pack", min: 0, max: 400, unit: "doses" }
+    { key: "irTaken", code: "IRT", label: "Taken Today", min: 0, max: 9,   unit: "doses" },
+    { key: "irFill",  code: "IRF", label: "Refill",      min: 0, max: 400, unit: "doses" }
   ];
 
   var ENERGY = [
@@ -983,7 +994,7 @@
   var statNodes = {};
   buildNumericFields(STATS, "stats");
   buildNumericFields(EXTRAS, "extras", true);
-  buildNumericFields(SUPPLY, "supply");
+  buildNumericFields(SUPPLY, "supply", true);
 
   /* `compact` renders a dose as one line — "Extra IR: 10 mg" — at the size of
      a marker row. A tall cell with a 23px number and a gauge was more furniture
@@ -1011,6 +1022,7 @@
       save(cur);
       paintGauge(s, fill, clean === "" ? null : +clean);
       renderSummary();
+      renderSupply();          // the pack reads from these very fields
     });
     input.addEventListener("blur", function () {
       var d = day(cur);
@@ -1019,7 +1031,7 @@
         if (v !== d[s.key]) { d[s.key] = v; input.value = v; save(cur); toast(s.label + " clamped to " + s.min + "–" + s.max); }
         paintGauge(s, fill, v);
       }
-      renderSummary(); renderGrid(); renderPatterns(); renderGuard();
+      renderSummary(); renderSupply(); renderGrid(); renderPatterns(); renderGuard();
     });
 
     $(hostId).appendChild(wrap);
@@ -1370,7 +1382,7 @@
       head.textContent = "No Pack";
       host.innerHTML = '<p class="empty">No pack open yet.<br>Put the pack size in ' +
         '<b>Refill</b> on the day you started it — ' + IR_PACK + ' is the usual — then log ' +
-        'each day under <b>IR Taken</b>.</p>';
+        'each day under <b>Taken Today</b>.</p>';
       return;
     }
 
@@ -1738,12 +1750,14 @@
         var o = k > today ? { future: true } : valueOf(data[k] || {}, k);
         var klass = "sq";
         if (o && o.future) klass += " future";
-        else if (o && o.na) klass += " na";
+        else if (o && o.napp) klass += " napp";      // you said it did not apply
+        else if (o && o.na) klass += " na";          // never scheduled in the first place
         else if (o) klass += " " + (o.cls || cls);
         if (k === cur) klass += " sel";
         if (o && o.n !== undefined) vals.push(o.n);
         s += '<span class="' + klass + '"' + (o && o.op ? ' style="opacity:' + o.op + '"' : "") +
-             ' data-d="' + k + '" title="' + esc(label + " · " + k + (o && o.t ? " · " + o.t : "")) + '"></span>';
+             ' data-d="' + k + '" title="' + esc(label + " · " + k + (o && o.t ? " · " + o.t : "")) + '">' +
+             (o && o.napp ? "N/A" : "") + '</span>';
       });
       s += '<span class="grid-sum"' + (color ? ' style="color:' + color + '"' : '') + '>' +
            summarize(vals) + '</span>';
@@ -1772,13 +1786,13 @@
        crowded the markers, which is what the grid is for. */
     html += '<div class="grid-rule"></div>';
     html += line("WRK", "var(--copper)", "c", function (d) {
-      if (d.work === NA) return { na: true, t: "not applicable" };
+      if (d.work === NA) return { napp: true, t: "not applicable" };
       var v = ratingNum(d.work);
       return v ? { op: (0.3 + 0.14 * v).toFixed(2), t: v + "/5", n: v } : null; }, avg1);
     html += line("ENG", "var(--copper)", "c", function (d) {
       var a = avgEnergy(d);
       if (a === null && ENERGY.some(function (e) { return d[e.key] === NA; })) {
-        return { na: true, t: "not applicable" };
+        return { napp: true, t: "not applicable" };
       }
       return a ? { op: (0.3 + 0.14 * a).toFixed(2), t: a.toFixed(1) + "/5", n: a } : null; }, avg1);
     CHOICE_ROWS.forEach(function (c) {

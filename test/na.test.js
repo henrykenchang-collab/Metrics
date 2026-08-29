@@ -61,9 +61,9 @@ c=open({"dailyReadout.v1":JSON.stringify({
 const cell=(k,code)=>c.w.document.getElementById("grid")
   .querySelector('.sq[data-d="'+k+'"][title^="'+code+'"]');
 ok(cell(back(2),"WRK").classList.contains("c"),"a scored day is still copper");
-ok(cell(back(1),"WRK").classList.contains("na"),"an N/A day is ghosted, not blank and not red");
+ok(cell(back(1),"WRK").classList.contains("napp"),"an N/A day gets the N/A treatment, not blank and not red");
 ok(/not applicable/.test(cell(back(1),"WRK").getAttribute("title")),"and says so on hover");
-ok(cell(back(1),"ENG").classList.contains("na"),"energy ghosts too when every point is N/A");
+ok(cell(back(1),"ENG").classList.contains("napp"),"energy marks N/A too when every point is N/A");
 ok(!/NaN/.test(c.w.document.getElementById("grid").innerHTML),"no NaN anywhere in the grid");
 const sums=[...c.w.document.getElementById("grid").querySelectorAll(".grid-sum")].map(e=>e.textContent);
 ok(!sums.some(t=>/NaN/.test(t)),"and the monthly averages are clean: "+sums.filter(Boolean).slice(-6).join(" "));
