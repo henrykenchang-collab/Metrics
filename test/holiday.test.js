@@ -61,6 +61,27 @@ ok((day(x,"2026-11-26")._na||[]).indexOf("fluency")>=0,"flagged as the app's doi
 x=open({},"2026-11-25","2026-11-25");            // the Wednesday before
 ok(!fluPills(x.w)[3].classList.contains("on"),"an ordinary Wednesday starts blank");
 
+console.log("\n-- work productivity follows the same rule --");
+const wrkNA=w=>w.document.getElementById("rates").children[4].querySelector(".na-seg");
+const wrkSegs=w=>[...w.document.getElementById("rates").children[4].querySelectorAll(".seg:not(.na-seg)")];
+x=open({},"2026-11-26","2026-11-26");                 // Thanksgiving, a Thursday
+ok(wrkNA(x.w).classList.contains("on"),"N/A is lit for work on Thanksgiving too");
+ok(wrkSegs(x.w).every(b=>!b.classList.contains("on")),"no score lit with it");
+[...x.w.document.getElementById("rows").children][0].dispatchEvent(new x.w.MouseEvent("click",{bubbles:true}));
+ok(day(x,"2026-11-26").work==="na","and it commits when the day is logged");
+ok((day(x,"2026-11-26")._na||[]).indexOf("work")>=0,"flagged as the app's doing");
+x=open({},"2026-11-25","2026-11-25");
+ok(!wrkNA(x.w).classList.contains("on"),"an ordinary Wednesday still asks for a score");
+x=open({},"2026-07-03","2026-07-03");                 // observed Independence Day, a Friday
+ok(wrkNA(x.w).classList.contains("on"),"an observed holiday counts, not just the real date");
+x=open({},"2026-07-02","2026-07-02");
+ok(!wrkNA(x.w).classList.contains("on"),"the day before does not");
+x=open({},"2026-11-26","2026-11-26");
+wrkSegs(x.w)[7].dispatchEvent(new x.w.MouseEvent("click",{bubbles:true}));
+ok(day(x,"2026-11-26").work===5,"a score on a holiday overrides");
+ok((day(x,"2026-11-26")._na||[]).indexOf("work")<0,"and clears its flag");
+ok(day(x,"2026-11-26").fluency==="na","without disturbing the fluency N/A");
+
 console.log("\n-- choosing makes it yours --");
 x=open({},"2026-11-26","2026-11-26");
 fluPills(x.w)[2].dispatchEvent(new x.w.MouseEvent("click",{bubbles:true}));   // Good

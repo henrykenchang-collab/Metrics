@@ -113,8 +113,8 @@ whatever summoned it takes it with it — a default must never be the thing that
 keeps an otherwise-empty day alive:
 
 - bed and wake (`_df`), cleared the moment you touch either
-- work productivity at the weekend, set to N/A
-- verbal fluency on any day off — weekend or federal holiday — set to N/A
+- work productivity and verbal fluency on any day off — weekend or federal
+  holiday — both set to N/A
 - an empty meal row, which is not stored at all until it has text
 
 The last three record which fields the app filled in under `_na`; `_dw` is the

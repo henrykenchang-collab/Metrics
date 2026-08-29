@@ -841,9 +841,10 @@
      day you never opened must not acquire a night's sleep. */
   var SLEEP_DEFAULT = { bed: "21:00", wake: "04:00" };
 
-  /* Saturday and Sunday are not working days, so productivity starts at N/A
-     rather than blank — a silence you would have to remember to fill. Tap a
-     score on a day you did work and it takes precedence. */
+  /* Weekends and federal holidays are not working days, so productivity and
+     fluency both start at N/A rather than blank — a silence you would have to
+     remember to fill. Tap a score on a day you did work and it takes
+     precedence. */
   var WEEKEND = [0, 6];
   function isWeekend(k) { return WEEKEND.indexOf(dow(k)) >= 0; }
 
@@ -890,7 +891,7 @@
   }
   function holidayName(k) { return holidays(+k.slice(0, 4))[k] || null; }
 
-  /* Not a working day: fluency has nothing to report on one. */
+  /* Not a working day: work and fluency have nothing to report on one. */
   function isOffDay(k) { return isWeekend(k) || !!holidayName(k); }
   var FROMRING = "_o";   // which of a day's fields the Oura puller owns
   var PUSH_BASE = 2500;  // ms of quiet before the page saves itself
@@ -1018,7 +1019,7 @@
              it: work on a weekend, fluency on any day off. Both are recorded as
              assumed, so undoing whatever summoned them takes them along. */
           var auto = autoNA(d).slice();
-          if (isWeekend(k) && d.work === undefined) { d.work = NA; auto.push("work"); }
+          if (isOffDay(k) && d.work === undefined) { d.work = NA; auto.push("work"); }
           if (isOffDay(k) && d.fluency === undefined) { d.fluency = NA; auto.push("fluency"); }
           if (auto.length) d[AUTO_NA] = auto;
           d[STAMP] = Date.now();
@@ -1876,7 +1877,7 @@
     RATINGS.forEach(function (r) {
       /* fill by position, not by value — the steps are not evenly spaced */
       var val = d[r.key];
-      if (val === undefined && r.key === "work" && isWeekend(cur)) val = NA;
+      if (val === undefined && r.key === "work" && isOffDay(cur)) val = NA;
       var idx = typeof val === "number" ? SCALE.indexOf(val) : -1;
       segNodes[r.key].forEach(function (s, i) {
         s.classList.toggle("on", i <= idx);
