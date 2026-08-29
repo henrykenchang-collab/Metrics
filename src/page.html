@@ -235,6 +235,9 @@
   .span { text-align: center; padding-bottom: 9px; }
   .span-v { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--violet); display: block; }
   .span-l { color: var(--ink-3); }
+  /* an assumed night reads quieter than a measured one */
+  .times.assumed .timein { color: var(--ink-3); }
+  .times.assumed .span-v { color: var(--ink-3); }
 
   .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); margin-top: 14px; border-top: 1px solid var(--line); }
   /* intake doses reuse the stat cell, in the accent hue */
@@ -262,9 +265,13 @@
   .curve { padding: 12px 16px 2px; }
   .curve svg { width: 100%; height: 52px; display: block; overflow: visible; }
   .rate-row { display: flex; align-items: center; gap: 10px; padding: 9px 16px; border-top: 1px solid var(--line); }
+  /* eight steps will not sit beside a label on a phone, so they get their own line */
+  .rate-row.scale { flex-direction: column; align-items: stretch; gap: 7px; padding: 10px 16px 12px; }
   .rate-name { flex: 1; font-size: 14.5px; font-weight: 500; letter-spacing: -.01em; min-width: 0; }
   .rate-name .row-sub { display: block; font-size: 11px; color: var(--ink-3); font-weight: 400; }
   .meter { display: flex; gap: 5px; flex: none; }
+  .rate-row.scale .meter { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+  .rate-row.scale .seg { width: auto; height: 34px; font-size: 11px; }
   .seg {
     width: 30px; height: 30px; border-radius: 8px;
     border: 1.5px solid var(--line-2); background: transparent;
@@ -340,6 +347,7 @@
   .grid-rule { height: 1px; background: var(--line); margin: 3px 0; }
   .sq { width: 13px; height: 13px; flex: none; border-radius: 3px; background: var(--surface-2); }
   .sq.on { background: var(--accent); }
+  .sq.gap { background: var(--neg); }
   .sq.c  { background: var(--copper); }
   .sq.v  { background: var(--violet); }
   .sq.sel { box-shadow: 0 0 0 1.5px var(--ink-3); }
@@ -432,6 +440,8 @@
   @media (max-width: 359px) {
     .seg { width: 26px; height: 26px; }
     .rate-row { gap: 6px; }
+    .rate-row.scale .seg { width: auto; height: 30px; font-size: 10px; }
+    .rate-row.scale .meter { gap: 3px; }
   }
   @media (prefers-reduced-motion: reduce) {
     * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
@@ -488,9 +498,9 @@
 
   <section class="panel">
     <div class="panel-head"><span class="code">Sleep &amp; Recovery</span><span class="code" style="color:var(--violet)">Measured</span></div>
-    <div class="times">
+    <div class="times" id="times">
       <label class="field"><span class="code">Bed Time</span><input class="timein" type="time" id="bed"></label>
-      <div class="span"><span class="span-v" id="span">—</span><span class="code span-l">In Bed</span></div>
+      <div class="span"><span class="span-v" id="span">—</span><span class="code span-l" id="spanLabel">In Bed</span></div>
       <label class="field"><span class="code">Wake Time</span><input class="timein" type="time" id="wake"></label>
     </div>
     <div class="stats" id="stats"></div>
@@ -533,6 +543,7 @@
       <span class="code"><i style="background:var(--accent)"></i>Markers</span>
       <span class="code"><i style="background:var(--copper)"></i>Self-Rated</span>
       <span class="code"><i style="background:var(--violet)"></i>Measured</span>
+      <span class="code"><i style="background:var(--neg)"></i>Missed</span>
       <span class="code"><i class="ghost"></i>Not Scheduled</span>
     </div>
     <p class="gridnote" id="gridnote"></p>
@@ -629,6 +640,12 @@
   ];
   var RATINGS = ENERGY.concat([{ key: "work", code: "WRK", name: "Work Productivity" }]);
 
+  /* Eight steps rather than five. Coarse at the bottom, where the difference
+     between a 1 and a 2 is obvious, and half-points from 2 up, where the
+     distinctions you actually make live. Stored as the number, so an old 1-5
+     entry is already on the scale. */
+  var SCALE = [1, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+
   /* Three-way ratings. Single-select pills rather than a cumulative meter,
      since "Bad" filling one segment would read as a quantity. */
   var FLUENCY = [{ v: "bad", label: "Bad" }, { v: "avg", label: "Average" }, { v: "good", label: "Good" }];
@@ -706,6 +723,12 @@
 
   var PAGE_TITLE = "Daily Readout";
   var STAMP = "_t";      // per-day last-write stamp — bookkeeping, never part of the log
+  var ASSUMED = "_df";   // bed/wake are the defaults below, not yet confirmed
+
+  /* Most nights look like this, so a day starts here and gets nudged rather
+     than typed. Applied only once a day has something else logged on it: a
+     day you never opened must not acquire a night's sleep. */
+  var SLEEP_DEFAULT = { bed: "21:00", wake: "04:00" };
   var FROMRING = "_o";   // which of a day's fields the Oura puller owns
   var PUSH_BASE = 2500;  // ms of quiet before the page saves itself
 
@@ -821,7 +844,19 @@
   function save(k) {
     if (k) {
       var d = data[k];
-      if (d) { if (logged(d)) d[STAMP] = Date.now(); else delete data[k]; }
+      if (d) {
+        if (entered(d)) {
+          // something real is here, so assume the usual night around it
+          if (!d.bed && !d.wake) {
+            d.bed = SLEEP_DEFAULT.bed;
+            d.wake = SLEEP_DEFAULT.wake;
+            d[ASSUMED] = 1;
+          }
+          d[STAMP] = Date.now();
+        } else {
+          delete data[k];      // clearing the last real entry clears the day
+        }
+      }
     }
     persistLocal();
     if (k) schedulePush();
@@ -954,32 +989,30 @@
     $(k).addEventListener("change", function () {
       var d = day(cur);
       if ($(k).value) d[k] = $(k).value; else delete d[k];
-      save(cur); renderSpan(); renderSummary();
+      delete d[ASSUMED];              // touched by hand, so no longer an assumption
+      save(cur); render();
     });
   });
 
   var segNodes = {};
   RATINGS.forEach(function (r) {
     var row = document.createElement("div");
-    row.className = "rate-row";
+    row.className = "rate-row scale";
     row.innerHTML = '<span class="rate-name">' + r.name + (r.sub ? '<span class="row-sub">' + r.sub + '</span>' : '') + '</span>';
     var meter = document.createElement("div");
     meter.className = "meter";
     var segs = [];
-    for (var i = 1; i <= 5; i++) {
-      (function (n) {
-        var b = document.createElement("button");
-        b.className = "seg"; b.type = "button"; b.textContent = n;
-        b.setAttribute("aria-label", r.name + (r.sub ? " " + r.sub : "") + ": " + n + " of 5");
-        b.addEventListener("click", function () {
-          var d = day(cur);
-          d[r.key] = (d[r.key] === n) ? 0 : n;
-          if (!d[r.key]) delete d[r.key];
-          save(cur); render();
-        });
-        meter.appendChild(b); segs.push(b);
-      })(i);
-    }
+    SCALE.forEach(function (n) {
+      var b = document.createElement("button");
+      b.className = "seg"; b.type = "button"; b.textContent = String(n);
+      b.setAttribute("aria-label", r.name + (r.sub ? " " + r.sub : "") + ": " + n + " out of 5");
+      b.addEventListener("click", function () {
+        var d = day(cur);
+        if (d[r.key] === n) delete d[r.key]; else d[r.key] = n;
+        save(cur); render();
+      });
+      meter.appendChild(b); segs.push(b);
+    });
     row.appendChild(meter);
     $("rates").appendChild(row);
     segNodes[r.key] = segs;
@@ -1178,9 +1211,25 @@
     return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null;
   }
   function mean(a) { return a.reduce(function (x, y) { return x + y; }, 0) / a.length; }
+  /* Content a person actually put there. An assumed bed/wake is not content:
+     without this, undoing the one marker that summoned it would leave the day
+     behind as a night's sleep nobody ever entered. */
+  function entered(d) {
+    if (!d) return false;
+    for (var k in d) {
+      if (!d.hasOwnProperty(k)) continue;
+      if (k === STAMP || k === FROMRING || k === ASSUMED) continue;
+      if (d[ASSUMED] && (k === "bed" || k === "wake")) continue;
+      return true;
+    }
+    return false;
+  }
+
   function logged(d) {
     if (!d) return false;
-    for (var k in d) if (d.hasOwnProperty(k) && k !== STAMP && k !== FROMRING) return true;
+    for (var k in d) {
+      if (d.hasOwnProperty(k) && k !== STAMP && k !== FROMRING && k !== ASSUMED) return true;
+    }
     return false;
   }
   function outcomeOf(d, which) {
@@ -1466,14 +1515,20 @@
       paintGauge(s, n.fill, v === undefined ? null : v);
     });
 
-    $("bed").value = d.bed || "";
-    $("wake").value = d.wake || "";
+    /* Show the usual night even before the day has anything on it, so the
+       picker opens where you want it. Dimmed until you confirm or change it. */
+    var assumed = !!d[ASSUMED] || (!d.bed && !d.wake);
+    $("bed").value = d.bed || SLEEP_DEFAULT.bed;
+    $("wake").value = d.wake || SLEEP_DEFAULT.wake;
+    $("times").classList.toggle("assumed", assumed);
+    $("spanLabel").textContent = assumed ? "Assumed" : "In Bed";
 
     RATINGS.forEach(function (r) {
-      var v = d[r.key] || 0;
+      /* fill by position, not by value — the steps are not evenly spaced */
+      var idx = d[r.key] ? SCALE.indexOf(d[r.key]) : -1;
       segNodes[r.key].forEach(function (s, i) {
-        s.classList.toggle("on", i < v);
-        s.setAttribute("aria-pressed", i < v ? "true" : "false");
+        s.classList.toggle("on", i <= idx);
+        s.setAttribute("aria-pressed", i === idx ? "true" : "false");
       });
     });
 
@@ -1499,7 +1554,8 @@
   }
 
   function renderSpan() {
-    var d = data[cur] || {}, m = inBed(d.bed, d.wake);
+    var d = data[cur] || {};
+    var m = inBed(d.bed || SLEEP_DEFAULT.bed, d.wake || SLEEP_DEFAULT.wake);
     $("span").textContent = m === null ? "—" : hm(m);
   }
 
@@ -1622,6 +1678,9 @@
         var done = !!d[m.key];
         if (!isDue(m, k)) return done ? { op: .5, t: "done, off schedule", cls: "on" } : { na: true };
         if (done) { hit++; return { op: 1, t: "done", n: 1 }; }
+        /* Red means you logged the day and this was not done. A day with
+           nothing on it stays blank: not opening the app is not a miss. */
+        if (logged(d)) return { op: 1, t: "missed", cls: "gap" };
         return null;
       }, function (v) { return dueDays ? v.length + "/" + dueDays : ""; });
     });
