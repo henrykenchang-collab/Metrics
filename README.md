@@ -12,6 +12,7 @@ Claude Artifact. One page, no build tooling beyond a single Python script.
 | `daily-readout.html` | generated; the file that gets published. Do not edit by hand |
 | `test/roundtrip.test.js` | jsdom tests, mostly guarding the self-republish |
 | `test/supply.test.js` | jsdom tests for the IR pack arithmetic |
+| `.claude/commands/oura-sync.md` | `/oura-sync` — the whole pull-and-publish loop |
 | `tools/oura_auth.py` | OAuth2 against Oura, run on your own machine |
 | `tools/oura_sync.py` | pulls sleep figures from an Oura ring into a seed |
 | `test/oura.test.py` | rules the puller must not break |
