@@ -95,16 +95,30 @@ syncs, and never counts as a day's content.
 The month arrows sit inside a head, so they stop the click from reaching it —
 stepping months is not folding. The label between them still folds.
 
+## Days off
+
+The eleven US federal holidays are computed, not listed, so this keeps working
+in 2027 and after. Fixed-date ones move the way the federal rule moves them: a
+Saturday is observed the Friday before, a Sunday the Monday after — the day
+actually taken off, which is the one that matters here. A 1 January falling on
+a Saturday is observed on 31 December, so each year also carries the next
+year's New Year observance when it lands inside it.
+
+The date line names the holiday, so an N/A on a Thursday explains itself.
+
 ## Defaults the app applies for you
 
-Three things get filled in on your behalf, and each is flagged so that undoing
+Four things get filled in on your behalf, and each is flagged so that undoing
 whatever summoned it takes it with it — a default must never be the thing that
 keeps an otherwise-empty day alive:
 
 - bed and wake (`_df`), cleared the moment you touch either
-- work productivity at the weekend, set to N/A (`_dw`), cleared the moment you
-  choose anything for it
+- work productivity at the weekend, set to N/A
+- verbal fluency on any day off — weekend or federal holiday — set to N/A
 - an empty meal row, which is not stored at all until it has text
+
+The last three record which fields the app filled in under `_na`; `_dw` is the
+older, work-only spelling and is still honoured for anything that carries it.
 
 `entered()` is the single place that knows the difference between something you
 put there and something the app assumed.

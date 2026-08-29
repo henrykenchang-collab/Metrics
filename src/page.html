@@ -328,6 +328,9 @@
   .pills { display: flex; gap: 4px; padding: 3px; background: var(--surface-2); border-radius: 11px; flex: none; }
   .pill { padding: 6px 11px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); transition: background .15s ease, color .15s ease, transform .15s ease; }
   .pill.on { background: var(--copper); color: var(--surface); }
+  /* neutral, like the N/A among the rating steps: an opt-out, not a verdict */
+  .na-pill { color: var(--ink-3); }
+  .na-pill.on { background: var(--ink-3); color: var(--surface); }
   .pill:active { transform: scale(.94); }
 
   /* ---------------- markers ---------------- */
@@ -748,12 +751,15 @@
   var FLU_OP = { bad: 0.34, avg: 0.62, good: 1 };
   var CHOICE_ROWS = [
     { key: "mood",    code: "MOOD", name: "Mood" },
-    { key: "fluency", code: "FLU",  name: "Verbal Fluency" }
+    { key: "fluency", code: "FLU",  name: "Verbal Fluency", na: true }
   ];
   function choiceLabel(v) {
+    if (v === NA) return "N/A";
     var f = FLUENCY.filter(function (x) { return x.v === v; })[0];
     return f ? f.label : "";
   }
+  /* "na" is a statement, not a rating: it must never reach the arithmetic */
+  function fluNum(v) { return FLU_N.hasOwnProperty(v) ? FLU_N[v] : null; }
 
   var MEALS = ["Breakfast", "Lunch", "Dinner"];
 
@@ -789,9 +795,9 @@
     { label: "Work Productivity",      dp: 1, unit: "",     move: 0.5, good: "up",
       get: function (d) { return ratingNum(d.work); } },
     { label: "Mood",                   dp: 1, unit: "",     move: 0.4, good: "up",
-      get: function (d) { return d.mood ? FLU_N[d.mood] : null; } },
+      get: function (d) { return fluNum(d.mood); } },
     { label: "Verbal Fluency",         dp: 1, unit: "",     move: 0.4, good: "up",
-      get: function (d) { return d.fluency ? FLU_N[d.fluency] : null; } },
+      get: function (d) { return fluNum(d.fluency); } },
     { label: "Sleep Score",            dp: 0, unit: "",     move: 5,   good: "up",
       get: function (d) { return d.sleep === undefined ? null : d.sleep; } },
     { label: "CPAP Score",             dp: 0, unit: "",     move: 5,   good: "up",
@@ -821,7 +827,14 @@
   var PAGE_TITLE = "Daily Readout";
   var STAMP = "_t";      // per-day last-write stamp — bookkeeping, never part of the log
   var ASSUMED = "_df";   // bed/wake are the defaults below, not yet confirmed
-  var WEEKEND_NA = "_dw"; // work was set N/A because it is a weekend, not because you said so
+  var AUTO_NA = "_na";   // fields set to N/A by the app, not by you
+  var WEEKEND_NA = "_dw"; // the older, work-only spelling of the same idea
+
+  function autoNA(d) {
+    var list = (d && d[AUTO_NA]) || [];
+    if (d && d[WEEKEND_NA] && list.indexOf("work") < 0) list = list.concat("work");
+    return list;
+  }
 
   /* Most nights look like this, so a day starts here and gets nudged rather
      than typed. Applied only once a day has something else logged on it: a
@@ -833,6 +846,52 @@
      score on a day you did work and it takes precedence. */
   var WEEKEND = [0, 6];
   function isWeekend(k) { return WEEKEND.indexOf(dow(k)) >= 0; }
+
+  /* The eleven US federal holidays, computed rather than listed, so this keeps
+     working in 2027 and after. Fixed-date ones move the way the federal rule
+     moves them: a Saturday is observed the Friday before, a Sunday the Monday
+     after — which is the day actually taken off, and so the day that matters
+     here. Floating ones already land on a weekday. */
+  function nthWeekday(y, m, wd, nth) {
+    var first = new Date(y, m, 1);
+    return new Date(y, m, 1 + ((wd - first.getDay() + 7) % 7) + (nth - 1) * 7);
+  }
+  function lastWeekday(y, m, wd) {
+    var end = new Date(y, m + 1, 0);
+    return new Date(y, m, end.getDate() - ((end.getDay() - wd + 7) % 7));
+  }
+  function observed(y, m, day) {
+    var d = new Date(y, m, day), w = d.getDay();
+    if (w === 6) d.setDate(d.getDate() - 1);
+    else if (w === 0) d.setDate(d.getDate() + 1);
+    return d;
+  }
+
+  var holidayCache = {};
+  function holidays(y) {
+    if (holidayCache[y]) return holidayCache[y];
+    var out = {};
+    function add(d, name) { if (d.getFullYear() === y) out[iso(d)] = name; }
+    add(observed(y, 0, 1),            "New Year's Day");
+    add(nthWeekday(y, 0, 1, 3),       "Martin Luther King Jr. Day");
+    add(nthWeekday(y, 1, 1, 3),       "Presidents' Day");
+    add(lastWeekday(y, 4, 1),         "Memorial Day");
+    add(observed(y, 5, 19),           "Juneteenth");
+    add(observed(y, 6, 4),            "Independence Day");
+    add(nthWeekday(y, 8, 1, 1),       "Labor Day");
+    add(nthWeekday(y, 9, 1, 2),       "Columbus Day");
+    add(observed(y, 10, 11),          "Veterans Day");
+    add(nthWeekday(y, 10, 4, 4),      "Thanksgiving");
+    add(observed(y, 11, 25),          "Christmas Day");
+    // a 1 January Saturday is observed on 31 December, which belongs to this year
+    add(observed(y + 1, 0, 1),        "New Year's Day");
+    holidayCache[y] = out;
+    return out;
+  }
+  function holidayName(k) { return holidays(+k.slice(0, 4))[k] || null; }
+
+  /* Not a working day: fluency has nothing to report on one. */
+  function isOffDay(k) { return isWeekend(k) || !!holidayName(k); }
   var FROMRING = "_o";   // which of a day's fields the Oura puller owns
   var PUSH_BASE = 2500;  // ms of quiet before the page saves itself
 
@@ -955,7 +1014,13 @@
             d.wake = SLEEP_DEFAULT.wake;
             d[ASSUMED] = 1;
           }
-          if (isWeekend(k) && d.work === undefined) { d.work = NA; d[WEEKEND_NA] = 1; }
+          /* Nothing to report is not the same as nothing said, so the app says
+             it: work on a weekend, fluency on any day off. Both are recorded as
+             assumed, so undoing whatever summoned them takes them along. */
+          var auto = autoNA(d).slice();
+          if (isWeekend(k) && d.work === undefined) { d.work = NA; auto.push("work"); }
+          if (isOffDay(k) && d.fluency === undefined) { d.fluency = NA; auto.push("fluency"); }
+          if (auto.length) d[AUTO_NA] = auto;
           d[STAMP] = Date.now();
         } else {
           delete data[k];      // clearing the last real entry clears the day
@@ -1183,13 +1248,18 @@
     var pills = document.createElement("div");
     pills.className = "pills";
     var nodes = [];
-    FLUENCY.forEach(function (f) {
+    var choices = c.na ? FLUENCY.concat([{ v: NA, label: "N/A" }]) : FLUENCY;
+    choices.forEach(function (f) {
       var b = document.createElement("button");
-      b.className = "pill"; b.type = "button"; b.textContent = f.label;
+      b.className = "pill" + (f.v === NA ? " na-pill" : "");
+      b.type = "button"; b.textContent = f.label;
       b.setAttribute("aria-label", c.name + ": " + f.label);
       b.addEventListener("click", function () {
         var d = day(cur);
         if (d[c.key] === f.v) delete d[c.key]; else d[c.key] = f.v;
+        var auto = autoNA(d).filter(function (x) { return x !== c.key; });
+        delete d[WEEKEND_NA]; delete d[AUTO_NA];
+        if (auto.length) d[AUTO_NA] = auto;      // choosing makes it yours
         save(cur); render();
       });
       pills.appendChild(b);
@@ -1451,11 +1521,12 @@
     if (!d) return false;
     for (var k in d) {
       if (!d.hasOwnProperty(k)) continue;
-      if (k === STAMP || k === FROMRING || k === ASSUMED || k === WEEKEND_NA) continue;
+      if (k === STAMP || k === FROMRING || k === ASSUMED ||
+          k === WEEKEND_NA || k === AUTO_NA) continue;
       if (d[ASSUMED] && (k === "bed" || k === "wake")) continue;
       /* an N/A this app applied on your behalf is not you saying anything, so
          it must not be what keeps an otherwise-empty day alive */
-      if (d[WEEKEND_NA] && k === "work") continue;
+      if (autoNA(d).indexOf(k) >= 0) continue;
       if (k === "meals") { if (hasMeals(d)) return true; continue; }
       return true;
     }
@@ -1466,14 +1537,14 @@
     if (!d) return false;
     for (var k in d) {
       if (d.hasOwnProperty(k) && k !== STAMP && k !== FROMRING &&
-          k !== ASSUMED && k !== WEEKEND_NA) return true;
+          k !== ASSUMED && k !== WEEKEND_NA && k !== AUTO_NA) return true;
     }
     return false;
   }
   function outcomeOf(d, which) {
     if (!d) return null;
     if (which === "energy") return avgEnergy(d);
-    if (which === "mood") return d.mood ? FLU_N[d.mood] : null;
+    if (which === "mood") return fluNum(d.mood);
     if (which === "work") return ratingNum(d.work);
     return d.sleep === undefined ? null : d.sleep;
   }
@@ -1753,6 +1824,8 @@
     $("dow").textContent = isToday ? "Today"
       : back === 1 ? "Yesterday"
       : dt.toLocaleDateString(undefined, { weekday: "long" }) + " \u00b7 " + back + " days back";
+    var hol = holidayName(cur);
+    if (hol) $("dow").textContent += " \u00b7 " + hol;
     $("dow").classList.toggle("past", !isToday);
     $("todayBtn").classList.toggle("past", !isToday);
     $("date").textContent = dt.toLocaleDateString(undefined, { month: "long", day: "numeric" });
@@ -1816,9 +1889,11 @@
     });
 
     CHOICE_ROWS.forEach(function (c) {
+      var val = d[c.key];
+      if (val === undefined && c.na && isOffDay(cur)) val = NA;   // shown before it is stored
       pillNodes[c.key].forEach(function (p) {
-        p.el.classList.toggle("on", d[c.key] === p.v);
-        p.el.setAttribute("aria-pressed", d[c.key] === p.v ? "true" : "false");
+        p.el.classList.toggle("on", val === p.v);
+        p.el.setAttribute("aria-pressed", val === p.v ? "true" : "false");
       });
     });
 
@@ -1863,7 +1938,9 @@
     if (ae !== null) chips.push('<span class="chip c"><span>ENG</span><b>' + ae.toFixed(1) + '</b></span>');
     if (ratingNum(d.work)) chips.push('<span class="chip c"><span>WRK</span><b>' + d.work + '/5</b></span>');
     CHOICE_ROWS.forEach(function (c) {
-      if (d[c.key]) chips.push('<span class="chip c"><span>' + c.code + '</span><b>' + choiceLabel(d[c.key]) + '</b></span>');
+      if (d[c.key] && d[c.key] !== NA) {
+        chips.push('<span class="chip c"><span>' + c.code + '</span><b>' + choiceLabel(d[c.key]) + '</b></span>');
+      }
     });
     EXTRAS.forEach(function (x) {
       if (d[x.key] !== undefined) {
@@ -1954,7 +2031,9 @@
       return a ? { op: (0.3 + 0.14 * a).toFixed(2), t: a.toFixed(1) + "/5", n: a } : null; }, avg1);
     CHOICE_ROWS.forEach(function (c) {
       html += line(c.code, "var(--copper)", "c", function (d) {
-        return d[c.key] ? { op: FLU_OP[d[c.key]], t: choiceLabel(d[c.key]), n: FLU_N[d[c.key]] } : null;
+        if (d[c.key] === NA) return { napp: true, t: "not applicable" };
+        var v = fluNum(d[c.key]);
+        return v ? { op: FLU_OP[d[c.key]], t: choiceLabel(d[c.key]), n: v } : null;
       }, avg1);
     });
 
