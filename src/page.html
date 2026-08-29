@@ -265,7 +265,7 @@
   .dose-name { flex: 1; font-size: 15px; font-weight: 500; letter-spacing: -.01em; }
   .dosein {
     font-family: var(--mono); font-variant-numeric: tabular-nums;
-    font-size: 15px; font-weight: 700; width: 4.4ch; text-align: right;
+    font-size: 15px; font-weight: 700; width: 5.6ch; text-align: right;
     padding: 0; color: var(--accent); background: none; border: 0;
     -webkit-appearance: none; appearance: none;
   }
@@ -596,6 +596,11 @@
   </section>
 
   <section class="panel">
+    <div class="panel-head"><span class="code">Activity</span><span class="code">Counted</span></div>
+    <div class="doses tight" id="activity"></div>
+  </section>
+
+  <section class="panel">
     <div class="panel-head"><span class="code">Energy &amp; Focus</span><span class="code" style="color:var(--copper)">Self-Rated</span></div>
     <div id="rates"></div>
     <div id="choices"></div>
@@ -719,6 +724,13 @@
   var XR_DAYS = 60;       // an XR refill covers this many
   var LOW_DAYS = 7;       // start saying so this close to the end
 
+  /* Steps is a plain count, not a composite anyone had to invent, so the
+     figure in Apple Health is the figure -- nothing to reconcile, which is
+     what made the sleep and CPAP scores such a poor fit for that route. */
+  var ACTIVITY = [
+    { key: "steps", label: "Steps", min: 0, max: 99999, unit: "", len: 5 }
+  ];
+
   var ENERGY = [
     { key: "ePre",  code: "E1", name: "Energy", sub: "Pre-Work AM" },
     { key: "eAM",   code: "E2", name: "Energy", sub: "Work AM" },
@@ -804,6 +816,8 @@
       get: function (d) { return d.cpap === undefined ? null : d.cpap; } },
     { label: "Heart Rate Variability", dp: 0, unit: " ms",  move: 5,   good: "up",
       get: function (d) { return d.hrv === undefined ? null : d.hrv; } },
+    { label: "Steps",                  dp: 0, unit: "",     move: 1500, good: "up",
+      get: function (d) { return d.steps === undefined ? null : d.steps; } },
     { label: "Heart Rate",             dp: 0, unit: " bpm", move: 4,   good: "down",
       get: function (d) { return d.hr === undefined ? null : d.hr; } },
     /* Doses read as average mg per logged day, so a rise catches taking the
@@ -1114,6 +1128,7 @@
   var statNodes = {};
   buildNumericFields(STATS, "stats");
   buildNumericFields(EXTRAS, "extras", true);
+  buildNumericFields(ACTIVITY, "activity", true);
   (function () {
     var wrap = document.createElement("label");
     wrap.className = "doserow";
@@ -1135,9 +1150,9 @@
     wrap.className = compact ? "doserow" : "stat";
     wrap.innerHTML = compact
       ? '<span class="dose-name">' + s.label + ':</span>' +
-        '<input class="dosein" type="text" inputmode="numeric" placeholder="––" maxlength="4" ' +
+        '<input class="dosein" type="text" inputmode="numeric" placeholder="––" maxlength="' + (s.len || 4) + '" ' +
           'aria-label="' + s.label + ' (' + s.min + ' to ' + s.max + ')">' +
-        '<span class="dose-unit">' + s.unit + '</span>'
+        (s.unit ? '<span class="dose-unit">' + s.unit + '</span>' : "")
       : '<span class="code stat-label">' + (s.short || s.label) + '</span>' +
         '<span class="stat-in"><input class="numin" type="text" inputmode="numeric" placeholder="––" maxlength="3" ' +
           'aria-label="' + s.label + ' (' + s.min + ' to ' + s.max + ')"><span class="stat-unit">' + s.unit + '</span></span>' +
@@ -1149,7 +1164,7 @@
       /* a lone "-" has to survive so the next keystroke can finish "-20",
          but it is not a number, so nothing is stored until a digit lands */
       var neg = !!(s.signed && input.value.charAt(0) === "-");
-      var digits = input.value.replace(/[^0-9]/g, "").slice(0, 3);
+      var digits = input.value.replace(/[^0-9]/g, "").slice(0, s.len || 3);
       var clean = (neg ? "-" : "") + digits;
       if (clean !== input.value) input.value = clean;
       var d = day(cur);
@@ -1860,7 +1875,7 @@
       }
     });
 
-    STATS.concat(EXTRAS).forEach(function (s) {
+    STATS.concat(EXTRAS).concat(ACTIVITY).forEach(function (s) {
       var n = statNodes[s.key], v = d[s.key];
       n.input.value = (v === undefined || v === null) ? "" : v;
       paintGauge(s, n.fill, v === undefined ? null : v);
@@ -1935,6 +1950,9 @@
     if (d.cpap !== undefined) chips.push('<span class="chip v"><span>CPAP</span><b>' + d.cpap + '</b></span>');
     if (d.hrv !== undefined) chips.push('<span class="chip v"><span>HRV</span><b>' + d.hrv + '</b></span>');
     if (d.hr !== undefined) chips.push('<span class="chip v"><span>HR</span><b>' + d.hr + '</b></span>');
+    if (d.steps !== undefined) {
+      chips.push('<span class="chip v"><span>STEP</span><b>' + d.steps.toLocaleString() + '</b></span>');
+    }
     var ae = avgEnergy(d);
     if (ae !== null) chips.push('<span class="chip c"><span>ENG</span><b>' + ae.toFixed(1) + '</b></span>');
     if (ratingNum(d.work)) chips.push('<span class="chip c"><span>WRK</span><b>' + d.work + '/5</b></span>');
@@ -2050,6 +2068,10 @@
       return { op: (0.22 + 0.78 * d.cpap / 100).toFixed(2), t: d.cpap, n: d.cpap }; }, avg0);
     html += line("HRV", "var(--violet)", "v", function (d) {
       return d.hrv !== undefined ? { op: (0.22 + 0.78 * d.hrv / 100).toFixed(2), t: d.hrv + " ms", n: d.hrv } : null; }, avg0);
+    html += line("STEP", "var(--violet)", "v", function (d) {
+      return d.steps !== undefined
+        ? { op: (0.22 + 0.78 * Math.min(1, d.steps / 12000)).toFixed(2), t: d.steps, n: d.steps }
+        : null; }, avg0);
     html += line("HR", "var(--violet)", "v", function (d) {
       return d.hr !== undefined ? { op: (0.22 + 0.78 * (d.hr - 35) / 90).toFixed(2), t: d.hr + " bpm", n: d.hr } : null; }, avg0);
 
@@ -2212,6 +2234,7 @@
       .concat(["Bed Time", "Wake Time", "Time in Bed"])
       .concat(STATS.map(function (s) { return s.label; }))
       .concat(EXTRAS.map(function (x) { return x.label + " (mg)"; }))
+      .concat(["Steps"])
       .concat(["Refill Date", "IR Days Left", "XR Days Left"])
       .concat(ENERGY.map(function (e) { return "Energy " + e.sub; }))
       .concat(["Work Productivity"])
@@ -2229,6 +2252,7 @@
         .concat([d.bed || "", d.wake || "", bedM === null ? "" : hm(bedM)])
         .concat(STATS.map(function (s) { return d[s.key] === undefined ? "" : d[s.key]; }))
         .concat(EXTRAS.map(function (x) { return d[x.key] === undefined ? "" : d[x.key]; }))
+        .concat([d.steps === undefined ? "" : d.steps])
         .concat([d.refill || "",
                  daysLeftAt(k, IR_DAYS),
                  daysLeftAt(k, XR_DAYS)])
