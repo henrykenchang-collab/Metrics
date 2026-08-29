@@ -82,6 +82,19 @@ again on the last day.
 `irTaken` and `irFill` are both gone from the interface. Days that carry them
 keep them in storage, unread — nothing written is ever deleted.
 
+## Folding panels
+
+Every `section.panel` folds from its header. The body wrapper is built at boot
+from whatever follows the head rather than written into the markup, so a new
+panel folds without being told to.
+
+Which panels are shut is a per-device convenience, not part of the log: it
+lives under its own `dailyReadout.shut` key, so it never enters the seed, never
+syncs, and never counts as a day's content.
+
+The month arrows sit inside a head, so they stop the click from reaching it —
+stepping months is not folding. The label between them still folds.
+
 ## Defaults the app applies for you
 
 Three things get filled in on your behalf, and each is flagged so that undoing

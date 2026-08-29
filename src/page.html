@@ -186,7 +186,20 @@
   .panel-head {
     display: flex; justify-content: space-between; align-items: center; gap: 10px;
     padding: 12px 16px 10px; color: var(--ink-3); border-bottom: 1px solid var(--line);
+    cursor: pointer; -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
+  /* the title takes the slack so the status and chevron stay right-aligned */
+  .panel-head > .code:first-child, .panel-head > .mnav { flex: 1; }
+  .panel-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  /* folded shut, the rule underneath would be a line under nothing */
+  .panel-head.shut { border-bottom: 0; }
+  .chev {
+    flex: none; display: grid; place-items: center; width: 14px; height: 14px;
+    color: var(--ink-3); transition: transform .18s ease;
+  }
+  .chev svg { width: 11px; height: 11px; }
+  .panel-head.shut .chev { transform: rotate(-90deg); }
   /* a second heading partway down a panel needs its own rule above it */
   .panel-head.sub { border-top: 1px solid var(--line); padding-top: 13px; }
 
@@ -2354,6 +2367,66 @@
   } else {
     capResolved = true; setSync("local");
   }
+
+  /* ============================================================
+     Folding panels.  Which are shut is a per-device convenience, not
+     part of the log: it lives in its own localStorage key so it never
+     enters the seed, never syncs, and never counts as a day's content.
+     ============================================================ */
+  var SHUTSTORE = "dailyReadout.shut";
+  var shut = {};
+  try {
+    (JSON.parse(localStorage.getItem(SHUTSTORE) || "[]") || []).forEach(function (id) { shut[id] = 1; });
+  } catch (e) { shut = {}; }
+
+  [].forEach.call(document.querySelectorAll("section.panel"), function (panel, i) {
+    var head = panel.querySelector(".panel-head");
+    if (!head) return;
+    if (!panel.id) panel.id = "p" + i;
+    var id = panel.id;
+
+    /* Everything after the head becomes the body. Wrapping here rather than
+       in the markup keeps the panels plain HTML and means a new one folds
+       without being told to. */
+    var body = document.createElement("div");
+    body.className = "panel-body";
+    while (head.nextSibling) body.appendChild(head.nextSibling);
+    panel.appendChild(body);
+
+    var chev = document.createElement("span");
+    chev.className = "chev";
+    chev.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M6 9l6 6 6-6"/></svg>';
+    head.appendChild(chev);
+
+    head.setAttribute("role", "button");
+    head.setAttribute("tabindex", "0");
+    var name = head.querySelector(".code");
+    if (name) head.setAttribute("aria-label", name.textContent);
+
+    function paint() {
+      var isShut = !!shut[id];
+      body.hidden = isShut;
+      head.classList.toggle("shut", isShut);
+      head.setAttribute("aria-expanded", isShut ? "false" : "true");
+    }
+    function toggle() {
+      if (shut[id]) delete shut[id]; else shut[id] = 1;
+      try { localStorage.setItem(SHUTSTORE, JSON.stringify(Object.keys(shut))); } catch (e) {}
+      paint();
+    }
+    head.addEventListener("click", toggle);
+    head.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+    });
+    paint();
+  });
+
+  /* the month arrows live inside a head, and stepping months is not folding */
+  ["mprev", "mnext"].forEach(function (id) {
+    $(id).addEventListener("click", function (e) { e.stopPropagation(); });
+  });
 
   var lastSeen = todayISO();
   setInterval(function () {
