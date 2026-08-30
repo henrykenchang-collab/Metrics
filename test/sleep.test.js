@@ -22,7 +22,7 @@ let c=open({});
 const cells=[...c.w.document.querySelectorAll("#stats .stat")];
 ok(cells.length===4,"still four cells");
 const labels=cells.map(e=>e.querySelector(".stat-label").textContent);
-ok(labels.join(" | ")==="Sleep | CPAP | HRV | Rest HR","short labels: "+labels.join(" | "));
+ok(labels.join(" | ")==="Sleep | Rest HR | HRV | CPAP","short labels, in order: "+labels.join(" | "));
 ok(labels.every(t=>t.length<=7),"none long enough to wrap in a quarter-width cell");
 ok(/\.stats \{[^}]*grid-template-columns: repeat\(4, 1fr\)/.test(css),"one row of four, not two of two");
 ok(/max-width: 359px\)[^}]*\{[^]*?\.stats \{ grid-template-columns: 1fr 1fr/.test(css),
@@ -33,15 +33,15 @@ ok(/\.numin \{[^}]*font-size: 18px/.test(css),"the number is smaller");
 console.log("\n-- the full names survive where they matter --");
 const aria=cells.map(e=>e.querySelector("input").getAttribute("aria-label"));
 ok(/Heart Rate Variability/.test(aria[2]),"a screen reader still hears the full name: "+aria[2]);
-ok(/Sleep Score/.test(aria[0])&&/Heart Rate \(35/.test(aria[3]),"and the ranges");
+ok(/Sleep Score/.test(aria[0])&&/Heart Rate \(35/.test(aria[1]),"and the ranges");
 
 console.log("\n-- and it still works --");
 const inp=cells.map(e=>e.querySelector("input"));
 inp[0].value="77"; inp[0].dispatchEvent(new c.w.Event("input",{bubbles:true}));
 inp[2].value="22"; inp[2].dispatchEvent(new c.w.Event("input",{bubbles:true}));
 ok(store(c).sleep===77&&store(c).hrv===22,"typing records");
-inp[3].value="200"; inp[3].dispatchEvent(new c.w.Event("input",{bubbles:true}));
-inp[3].dispatchEvent(new c.w.Event("blur",{bubbles:true}));
+inp[1].value="200"; inp[1].dispatchEvent(new c.w.Event("input",{bubbles:true}));   // Rest HR sits second now
+inp[1].dispatchEvent(new c.w.Event("blur",{bubbles:true}));
 ok(store(c).hr===125,"clamping still holds");
 ok(cells[0].querySelector(".gauge > i").style.width==="77%","the gauge still fills");
 ok(/SLP77/.test(c.w.document.getElementById("chips").textContent.replace(/\s/g,"")),"chips unchanged");

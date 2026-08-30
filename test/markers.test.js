@@ -12,7 +12,8 @@ function open(jar,sess){jar=jar||{};sess=sess||{};
        setItem:(k,v)=>{st[k]=String(v);},removeItem:k=>{delete st[k];}},configurable:true});}}).window;
   return {w,jar};
 }
-const rowFor=(w,c)=>[...w.document.getElementById("rows").children]
+// markers render into Daily Markers or, when grouped, into their own panel
+const rowFor=(w,c)=>[...w.document.querySelectorAll("#rows > *, #petrows > *")]
   .find(b=>b.querySelector(".row-code").textContent===c);
 const title=(w,c)=>rowFor(w,c).querySelector(".row-name").textContent.trim();
 const store=c=>JSON.parse(c.jar["dailyReadout.v1"]||"{}")[TODAY]||{};
@@ -21,7 +22,8 @@ console.log("\n-- Gym --");
 let c=open({});
 ok(!!rowFor(c.w,"GYM"),"a GYM row exists");
 ok(title(c.w,"GYM")==="Gym: Sun · Mon · Thu · Fri","reads: "+JSON.stringify(title(c.w,"GYM")));
-ok(c.w.document.getElementById("rows").children.length===11,"eleven markers now (Weights folded into Gym)");
+ok(c.w.document.querySelectorAll("#rows > *, #petrows > *").length===13,"thirteen markers now, across two panels");
+ok(c.w.document.getElementById("petrows").children.length===3,"three of them in Shanti and Buddha");
 rowFor(c.w,"GYM").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
 ok(store(c).gym===true,"it records");
 const labels=[...c.w.document.getElementById("grid").querySelectorAll(".grid-label")].map(e=>e.textContent);
@@ -34,10 +36,33 @@ ok(title(c.w,"CLD")==="Cold Plunge: Not Sat","Cold Plunge: Not Sat");
 ok(!rowFor(c.w,"WGT"),"Weights is gone, folded into Gym");
 ok(title(c.w,"VIT")==="Vitamins","a marker with no schedule keeps just its name");
 ok(title(c.w,"KET")==="Keto","and so does Keto");
-ok(title(c.w,"WLK")==="Walk: PM · Not Sat","target and schedule combine");
+ok(title(c.w,"WLK")==="Walk with Shanti: PM · Not Sat","target and schedule combine");
 ok(/^Read: 15 Min · Not Sat$|^Read: 30 Min · Not Sat$/.test(title(c.w,"RDG")),
    "Read carries its target too: "+title(c.w,"RDG"));
 ok(rowFor(c.w,"SAU").querySelectorAll(".row-name > *").length===1,"one line, one nested span");
+
+console.log("\n-- Shanti and Buddha --");
+c=open({});
+const heads=[...c.w.document.querySelectorAll("section.panel .panel-head .code:first-child")].map(e=>e.textContent);
+ok(heads.indexOf("Shanti and Buddha")===heads.indexOf("Daily Markers")+1,
+   "its panel sits right after Daily Markers: "+heads.join(" | "));
+const pets=[...c.w.document.getElementById("petrows").children]
+  .map(b=>b.querySelector(".row-name").textContent.trim());
+ok(pets.join(" | ")==="Walk with Shanti: PM · Not Sat | Buddha Brush | Shanti Brush",
+   "the three activities, in order: "+pets.join(" | "));
+ok(!c.w.document.getElementById("rows").textContent.match(/Shanti|Buddha/),
+   "and none of them is left behind in Daily Markers");
+// a grouped marker is still a marker everywhere that is not the panel it renders in
+rowFor(c.w,"BUD").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
+ok(store(c).buddhaBrush===true,"Buddha Brush records");
+rowFor(c.w,"SHA").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
+ok(store(c).shantiBrush===true,"Shanti Brush records");
+const gl=[...c.w.document.getElementById("grid").querySelectorAll(".grid-label")].map(e=>e.textContent);
+ok(gl.includes("WLK")&&gl.includes("BUD")&&gl.includes("SHA"),"all three have month-grid rows");
+ok(rowFor(c.w,"BUD").querySelector(".streak").textContent.endsWith("d"),"and carry a streak like any other");
+ok(/\/\d/.test(c.w.document.getElementById("scoreD").textContent),
+   "the readout still counts a denominator: "+c.w.document.getElementById("scoreD").textContent);
+ok(!/NaN/.test(c.w.document.getElementById("grid").innerHTML),"grid clean");
 
 console.log("\n-- the day's target still varies --");
 // find a Sunday and a weekday within this month's grid to compare Read's target

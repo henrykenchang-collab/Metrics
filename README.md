@@ -172,6 +172,13 @@ A marker's `since` (an ISO date) treats every day before it the same way: not
 due, so a lapse from before you actually started the habit is never counted
 against you. Sauna carries one, dated to the Monday it entered the routine.
 
+`group` names the panel body a marker renders into — `petrows` for the Shanti
+and Buddha activities. Without one it goes to Daily Markers. Only the
+rendering splits: streaks, the month grid, the readout's due count, the
+guardrails and the export all walk `MARKERS` whole, so a grouped marker is a
+marker in every way that counts. Adding a category means a new `<section
+class="panel">` with an empty host div and that div's id as the `group`.
+
 `invert: true` (TH, YT) is for the handful of markers that track something to
 do *less* of. The streak grows on days you leave it alone — blank days
 included — and breaks on the day you tap it; the guardrail's "lapsed" alert

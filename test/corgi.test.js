@@ -28,7 +28,7 @@ const w=new JSDOM("<!doctype html><html><head><meta charset='utf-8'></head><body
    Object.defineProperty(w,"localStorage",{value:{getItem:k=>(k in jar?jar[k]:null),
     setItem:(k,v)=>{jar[k]=String(v);},removeItem:k=>{delete jar[k];}},configurable:true});}}).window;
 setTimeout(()=>{
-  ok(w.document.getElementById("rows").children.length===11,"11 markers still render");
+  ok(w.document.querySelectorAll("#rows > *, #petrows > *").length===13,"13 markers still render");
   const sub=c=>[...w.document.getElementById("rows").children]
     .find(b=>b.querySelector(".row-code").textContent===c).querySelector(".row-sub").textContent.trim().replace(/^:\s*/,"");
   ok(sub("GRN")==="Sun · Mon · Wed","greens schedule intact");

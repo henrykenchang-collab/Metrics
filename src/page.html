@@ -614,6 +614,11 @@
   </section>
 
   <section class="panel">
+    <div class="panel-head"><span class="code">Shanti and Buddha</span><span class="code">Streak</span></div>
+    <div id="petrows"></div>
+  </section>
+
+  <section class="panel">
     <div class="panel-head">
       <div class="mnav">
         <button class="mshuttle" id="mprev" aria-label="Previous Month">
@@ -699,7 +704,15 @@
        and breaks the day you tap it */
     { key: "th",       code: "TH",  name: "TH",  invert: true },
     { key: "yt",       code: "YT",  name: "YT",  invert: true },
-    { key: "walkpm",   code: "WLK", name: "Walk", sub: "PM", days: [0, 1, 2, 3, 4, 5] }
+
+    /* `group` names the panel body a marker renders into; without one it
+       goes to Daily Markers. Only the rendering splits — streaks, the month
+       grid, the readout's due count, the guardrails and the export all walk
+       MARKERS whole, so a grouped marker is a marker in every way that counts. */
+    { key: "walkpm",      code: "WLK", name: "Walk with Shanti", sub: "PM",
+      days: [0, 1, 2, 3, 4, 5], group: "petrows" },
+    { key: "buddhaBrush", code: "BUD", name: "Buddha Brush", group: "petrows" },
+    { key: "shantiBrush", code: "SHA", name: "Shanti Brush", group: "petrows" }
   ];
 
   var DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -709,9 +722,9 @@
      wrapped. `label` still goes to the export and the screen reader. */
   var STATS = [
     { key: "sleep", label: "Sleep Score",            short: "Sleep",   min: 0,  max: 100, unit: "/100" },
-    { key: "cpap",  label: "CPAP Score",             short: "CPAP",    min: 0,  max: 100, unit: "/100" },
+    { key: "hr",    label: "Heart Rate",             short: "Rest HR", min: 35, max: 125, unit: "bpm" },
     { key: "hrv",   label: "Heart Rate Variability", short: "HRV",     min: 0,  max: 100, unit: "ms" },
-    { key: "hr",    label: "Heart Rate",             short: "Rest HR", min: 35, max: 125, unit: "bpm" }
+    { key: "cpap",  label: "CPAP Score",             short: "CPAP",    min: 0,  max: 100, unit: "/100" }
   ];
 
   /* Quantified intakes — same family as the markers (things you take),
@@ -1306,7 +1319,7 @@
       if (d[m.key]) delete d[m.key]; else d[m.key] = true;
       save(cur); render();
     });
-    $("rows").appendChild(b);
+    $(m.group || "rows").appendChild(b);
     rowNodes[m.key] = b;
   });
 
