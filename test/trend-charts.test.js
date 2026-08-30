@@ -84,6 +84,37 @@ const dotYs = [...sleepTrendChart.querySelectorAll(".tc-dot")].map(c => +c.getAt
 ok(Math.abs(y1 - dotYs[0]) < 0.5 && Math.abs(y2 - dotYs[2]) < 0.5,
    "a perfectly straight run of weeks puts the trend line right through the first and last dot");
 
+console.log("\n-- a month/year tick marks the bottom axis wherever the weeks cross into a new month --");
+// three Mondays, each in a different, distinct calendar month, safely in the
+// past regardless of when this test runs
+const monthWeek = mon => { const seed = {}; for (let i = 0; i < 7; i++) seed[shift(mon, i)] = { sleep: 70, _t: 1 }; return seed; };
+const dateOf = k => { const p = k.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); };
+const monthYearOf = k => dateOf(k).toLocaleDateString(undefined, { month: "short", year: "2-digit" });
+const monthOnlyOf = k => dateOf(k).toLocaleDateString(undefined, { month: "short" });
+// same calendar year throughout: only the first tick needs the year, the
+// rest would just repeat it and crowd the axis for nothing
+const monthMons = ["2020-01-06", "2020-02-03", "2020-03-02"];
+const monthSeed = Object.assign({}, ...monthMons.map(monthWeek));
+c = open({ "dailyReadout.v1": JSON.stringify(monthSeed) });
+click(c.w, c.w.document.getElementById("chartsLink"));
+const monthChart = [...c.w.document.querySelectorAll(".trend-chart")][0];
+const tickTexts = [...monthChart.querySelectorAll(".tc-tick")].map(t => t.textContent);
+const expectedTicks = [monthYearOf(monthMons[0]), monthOnlyOf(monthMons[1]), monthOnlyOf(monthMons[2])];
+ok(tickTexts.join(",") === expectedTicks.join(","),
+   "one tick per month, oldest first, year only where it's needed: " + tickTexts.join(","));
+ok(monthChart.querySelectorAll(".tc-tickline").length === tickTexts.length, "a tick mark to match each label");
+
+console.log("\n-- and the year rides along again the moment it actually changes --");
+const yearMons = ["2019-11-04", "2019-12-02", "2020-01-06"];
+const yearSeed = Object.assign({}, ...yearMons.map(monthWeek));
+c = open({ "dailyReadout.v1": JSON.stringify(yearSeed) });
+click(c.w, c.w.document.getElementById("chartsLink"));
+const yearChart = [...c.w.document.querySelectorAll(".trend-chart")][0];
+const yearTicks = [...yearChart.querySelectorAll(".tc-tick")].map(t => t.textContent);
+const expectedYearTicks = [monthYearOf(yearMons[0]), monthOnlyOf(yearMons[1]), monthYearOf(yearMons[2])];
+ok(yearTicks.join(",") === expectedYearTicks.join(","),
+   "Nov '19, Dec (same year, no repeat), Jan '20 (the rollover gets it back): " + yearTicks.join(","));
+
 console.log("\n-- days within one week collapse to a single averaged point --");
 const monA = weekAgo(0);
 c = open({ "dailyReadout.v1": JSON.stringify({

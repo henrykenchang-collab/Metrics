@@ -162,6 +162,7 @@
      shrinking both is what makes the shape underneath legible. */
   .tc-line { fill: none; stroke: var(--violet); stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
   .tc-axis { stroke: var(--line); stroke-width: 1; }
+  .tc-tickline { stroke: var(--line); stroke-width: 1; }
   .tc-tick { font-family: var(--mono); font-size: 8.5px; fill: var(--ink-3); }
   .tc-cross { stroke: var(--line-2); stroke-width: 1; stroke-dasharray: 2 2; }
   .tc-dot { fill: var(--violet); opacity: .7; }
@@ -1797,6 +1798,13 @@
     return fromISO(k).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   }
 
+  function monthYear(k) {
+    return fromISO(k).toLocaleDateString(undefined, { month: "short", year: "2-digit" });
+  }
+  function monthOnly(k) {
+    return fromISO(k).toLocaleDateString(undefined, { month: "short" });
+  }
+
   function weekLine() {
     var today = todayISO(), net = weekNet(today, "extraIr");
     if (net === null) return "";
@@ -2387,9 +2395,10 @@
     var pad = (vMax - vMin) * 0.12;
     vMin -= pad; vMax += pad;
 
-    // extra headroom above the data range: the value label sits above its
-    // dot, and without room of its own it would run past the chart's edge
-    var W = 320, H = 122, PAD_L = 2, PAD_R = 2, PAD_T = 16, PAD_B = 6;
+    // extra headroom above the data range for the value label sitting above
+    // its dot, and below for the month/year axis ticks -- without room of
+    // their own either would run past the chart's edge
+    var W = 320, H = 122, PAD_L = 2, PAD_R = 2, PAD_T = 16, PAD_B = 16;
     var t0 = fromISO(first).getTime(), span = Math.max(1, fromISO(last).getTime() - t0);
 
     function xAt(k) { return PAD_L + (fromISO(k).getTime() - t0) / span * (W - PAD_L - PAD_R); }
@@ -2407,6 +2416,37 @@
     var trendLine = '<line class="tc-trend" x1="' + xAt(first).toFixed(1) + '" y1="' + yAt(fit.first).toFixed(1) +
       '" x2="' + xAt(last).toFixed(1) + '" y2="' + yAt(fit.last).toFixed(1) + '"></line>';
 
+    // one tick wherever the plotted weeks cross into a new calendar month, so
+    // scanning across the line tells you when, not just the overall span
+    // already named up in .tc-range -- the year rides along only on the
+    // first tick and wherever it actually changes, or ~10 months of these
+    // packed into one small chart overlap into an unreadable smear
+    var lastYm = null, lastYear = null, monthTicks = [];
+    pts.forEach(function (p) {
+      var dt = fromISO(p.k), ym = dt.getFullYear() * 12 + dt.getMonth(), yr = dt.getFullYear();
+      if (ym !== lastYm) {
+        var x = xAt(p.k), label = (lastYear === null || yr !== lastYear) ? monthYear(p.k) : monthOnly(p.k);
+        monthTicks.push({ x: x, label: label, anchor: x < 20 ? "start" : (x > W - 20 ? "end" : "middle") });
+        lastYm = ym; lastYear = yr;
+      }
+    });
+    // a sparsely-logged month can butt its tick right up against the next
+    // one; drop any tick whose label would actually run into the last one
+    // kept, rather than let the two overlap into an unreadable smear. Widths
+    // are estimated (monospace, so a flat per-character figure holds).
+    var CHAR_W = 5.1, rightEdge = -Infinity;
+    monthTicks = monthTicks.filter(function (t) {
+      var w = t.label.length * CHAR_W;
+      var left = t.anchor === "start" ? t.x : (t.anchor === "end" ? t.x - w : t.x - w / 2);
+      if (left < rightEdge + 3) return false;
+      rightEdge = left + w;
+      return true;
+    });
+    var ticks = monthTicks.map(function (t) {
+      return '<line class="tc-tickline" x1="' + t.x.toFixed(1) + '" y1="' + (H - PAD_B) + '" x2="' + t.x.toFixed(1) + '" y2="' + (H - PAD_B + 3) + '"></line>' +
+        '<text class="tc-tick" style="text-anchor:' + t.anchor + '" x="' + t.x.toFixed(1) + '" y="' + (H - 2) + '">' + t.label + '</text>';
+    }).join("");
+
     wrap.innerHTML =
       '<div class="tc-head"><span class="tc-name">' + esc(spec.label) + '</span>' +
         '<span class="tc-range">' + shortDate(first) + ' – ' + shortDate(last) + '</span></div>' +
@@ -2418,6 +2458,7 @@
           '<path class="tc-line" d="' + d + '"></path>' +
           dots +
           labels +
+          ticks +
           '<line class="tc-cross" x1="0" y1="0" x2="0" y2="' + H + '" style="opacity:0"></line>' +
         '</svg>' +
         '<div class="tc-tooltip"></div>' +
