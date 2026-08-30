@@ -35,7 +35,8 @@ ok(!labels.includes("IR"),"no IR row");
 ok(!labels.includes("XR"),"no XR row");
 ok(!labels.includes("IRT"),"no IRT row");
 ok(labels.includes("VIT")&&labels.includes("WLK"),"markers still there");
-ok(labels.includes("SLP")&&labels.includes("HRV")&&labels.includes("HR"),"biometrics still there");
+ok(labels.includes("CPAP")&&!labels.includes("SLP")&&!labels.includes("HRV")&&!labels.includes("HR"),
+   "CPAP is the only sleep metric on the table now: "+labels.join(","));
 ok(labels.includes("WRK")&&labels.includes("ENG"),"self-rated still there");
 const rules=c.w.document.getElementById("grid").querySelectorAll(".grid-rule").length;
 ok(rules===2,"two dividers, not three with an empty band: "+rules);

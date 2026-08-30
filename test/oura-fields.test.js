@@ -50,12 +50,14 @@ setTimeout(() => {
   const line = copied.split("\n").find(l => l.indexOf(TODAY) === 0) || "";
   ok(/,58,35,90,600,/.test(line), "and the values land in the row: " + line);
 
-  console.log("\n-- month grid, Patterns and guardrail trends --");
+  console.log("\n-- kept off the month grid, but still Patterns and guardrail trends --");
   const gl = [...c.w.document.getElementById("grid").querySelectorAll(".grid-label")].map(e => e.textContent);
-  ok(gl.includes("AHR") && gl.includes("DEEP") && gl.includes("REM") && gl.includes("LITE"),
-     "all four have their own month-grid row: " + gl.join(","));
+  ok(!gl.includes("AHR") && !gl.includes("DEEP") && !gl.includes("REM") && !gl.includes("LITE"),
+     "none of the four Oura fields gets a month-grid row: " + gl.join(","));
+  ok(gl.includes("CPAP") && !gl.includes("SLP") && !gl.includes("HRV") && !gl.includes("HR"),
+     "CPAP is the only sleep metric left on the table: " + gl.join(","));
   const rules = c.w.document.getElementById("grid").querySelectorAll(".grid-rule").length;
-  ok(rules === 2, "no new divider -- they join the existing biometrics block");
+  ok(rules === 2, "the dividers are unaffected, only what sits under the second one");
   const outBtns = [...c.w.document.getElementById("outcome").children].map(b => b.textContent);
   ok(["Avg HR", "Deep Sleep", "REM Sleep", "Light Sleep"].every(l => outBtns.includes(l)),
      "all four are pickable as a Patterns outcome: " + outBtns.join(" | "));

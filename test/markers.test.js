@@ -12,6 +12,22 @@ function open(jar,sess){jar=jar||{};sess=sess||{};
        setItem:(k,v)=>{st[k]=String(v);},removeItem:k=>{delete st[k];}},configurable:true});}}).window;
   return {w,jar};
 }
+// pins the clock itself, for a day after `since` that isn't today (which the
+// app otherwise refuses to view, since it never lets you page past today)
+function openFake(fakeToday){
+  const sess={"dailyReadout.cur":JSON.stringify({d:fakeToday,on:fakeToday})};
+  const w=new JSDOM("<!doctype html><html><head><meta charset='utf-8'></head><body>"+HTML+"</body></html>",
+   {runScripts:"dangerously",pretendToBeVisual:true,url:"https://a.test/",
+    beforeParse(w){w.HTMLCanvasElement.prototype.getContext=()=>null;
+     const Real=w.Date, fixed=fakeToday+"T12:00:00";
+     function Fake(...a){ return a.length ? new Real(...a) : new Real(fixed); }
+     Fake.prototype=Real.prototype; Fake.now=()=>new Real(fixed).getTime();
+     Fake.parse=Real.parse; Fake.UTC=Real.UTC; w.Date=Fake;
+     for(const[n,st]of[["localStorage",{}],["sessionStorage",sess]])
+      Object.defineProperty(w,n,{value:{getItem:k=>(k in st?st[k]:null),
+       setItem:(k,v)=>{st[k]=String(v);},removeItem:k=>{delete st[k];}},configurable:true});}}).window;
+  return {w};
+}
 // markers render into Daily Markers or, when grouped, into their own panel
 const rowFor=(w,c)=>[...w.document.querySelectorAll("#rows > *, #petrows > *")]
   .find(b=>b.querySelector(".row-code").textContent===c);
@@ -48,8 +64,8 @@ ok(heads.indexOf("Shanti and Buddha")===heads.indexOf("Daily Markers")+1,
    "its panel sits right after Daily Markers: "+heads.join(" | "));
 const pets=[...c.w.document.getElementById("petrows").children]
   .map(b=>b.querySelector(".row-name").textContent.trim());
-ok(pets.join(" | ")==="Walk with Shanti: PM · Not Sat | Buddha Brush | Shanti Brush",
-   "the three activities, in order: "+pets.join(" | "));
+ok(pets.join(" | ")==="Walk with Shanti: PM · Not Sat | Buddha Brush: Sun | Shanti Brush: Sun",
+   "the three activities, weekly for the two brushes: "+pets.join(" | "));
 ok(!c.w.document.getElementById("rows").textContent.match(/Shanti|Buddha/),
    "and none of them is left behind in Daily Markers");
 // a grouped marker is still a marker everywhere that is not the panel it renders in
@@ -58,8 +74,25 @@ ok(store(c).buddhaBrush===true,"Buddha Brush records");
 rowFor(c.w,"SHA").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
 ok(store(c).shantiBrush===true,"Shanti Brush records");
 const gl=[...c.w.document.getElementById("grid").querySelectorAll(".grid-label")].map(e=>e.textContent);
-ok(gl.includes("WLK")&&gl.includes("BUD")&&gl.includes("SHA"),"all three have month-grid rows");
+ok(gl.includes("WLK"),"Walk still has a month-grid row");
+ok(!gl.includes("BUD")&&!gl.includes("SHA"),"but the once-a-week brushes are left off the table: "+gl.join(","));
 ok(rowFor(c.w,"BUD").querySelector(".streak").textContent.endsWith("d"),"and carry a streak like any other");
+
+console.log("\n-- the brushes are weekly, starting today --");
+const lastSun=(()=>{const d=new Date();while(d.getDay()!==0)d.setDate(d.getDate()-1);return iso(d);})();
+c=open({},{"dailyReadout.cur":JSON.stringify({d:lastSun,on:TODAY})});
+ok(!rowFor(c.w,"BUD").classList.contains("notdue"),"due on Sunday: "+lastSun);
+// a day after `since` that is not today: the app won't let you page past
+// today, so the clock itself is pinned to view one
+const nextTue=openFake("2026-09-01").w;
+ok(nextTue.document.getElementById("date").textContent.length>0,"the pinned day opened");
+ok(rowFor(nextTue,"BUD").classList.contains("notdue")&&rowFor(nextTue,"SHA").classList.contains("notdue"),
+   "not due on a Tuesday, well after `since`");
+// a lapse from before the practice existed must never surface as a guardrail miss
+c=open({"dailyReadout.v1":JSON.stringify({
+  "2026-06-01":{vitamins:true,_t:1}})});   // a Monday, long before either since-date, both due-but-undone if not for `since`
+ok(!/Buddha|Shanti/.test(c.w.document.getElementById("guard").textContent),
+   "no pre-existing lapse: "+c.w.document.getElementById("guard").textContent.slice(0,200));
 ok(/\/\d/.test(c.w.document.getElementById("scoreD").textContent),
    "the readout still counts a denominator: "+c.w.document.getElementById("scoreD").textContent);
 ok(!/NaN/.test(c.w.document.getElementById("grid").innerHTML),"grid clean");

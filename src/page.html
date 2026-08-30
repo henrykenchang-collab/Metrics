@@ -721,13 +721,20 @@
     { key: "yt",       code: "YT",  name: "YT",  invert: true },
 
     /* `group` names the panel body a marker renders into; without one it
-       goes to Daily Markers. Only the rendering splits — streaks, the month
-       grid, the readout's due count, the guardrails and the export all walk
-       MARKERS whole, so a grouped marker is a marker in every way that counts. */
+       goes to Daily Markers. Only the rendering splits — streaks, the
+       readout's due count, the guardrails and the export all walk MARKERS
+       whole, so a grouped marker is a marker in every way that counts,
+       except where `noGrid` says otherwise (below). */
     { key: "walkpm",      code: "WLK", name: "Walk with Shanti", sub: "PM",
       days: [0, 1, 2, 3, 4, 5], group: "petrows" },
-    { key: "buddhaBrush", code: "BUD", name: "Buddha Brush", group: "petrows" },
-    { key: "shantiBrush", code: "SHA", name: "Shanti Brush", group: "petrows" }
+    /* Weekly, not daily — due on Sunday only — and, being brand new
+       practices as of today, `since` keeps any day before this one from
+       ever reading as a lapse. `noGrid` keeps them off the month table:
+       once-a-week rows would read mostly as ghost squares there. */
+    { key: "buddhaBrush", code: "BUD", name: "Buddha Brush", group: "petrows",
+      days: [0], since: "2026-08-30", noGrid: true },
+    { key: "shantiBrush", code: "SHA", name: "Shanti Brush", group: "petrows",
+      days: [0], since: "2026-08-30", noGrid: true }
   ];
 
   var DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -2096,6 +2103,7 @@
     var avg0 = function (v) { return v.length ? String(Math.round(mean(v))) : ""; };
 
     MARKERS.forEach(function (m) {
+      if (m.noGrid) return;
       var dueDays = dates.filter(function (k) { return k <= today && isDue(m, k); }).length;
       possible += dueDays;
       html += line(m.code, null, "on", function (d, k) {
@@ -2132,9 +2140,11 @@
       }, avg1);
     });
 
+    /* CPAP is the one sleep metric kept here; Sleep/HRV/HR/Avg HR/the sleep
+       stages all have their own numbers in Sleep & Recovery and, now that
+       Sleep/HR/HRV are color-banded there, that panel is the place to read
+       them — this table is for what changes day to day at a glance. */
     html += '<div class="grid-rule"></div>';
-    html += line("SLP", "var(--violet)", "v", function (d) {
-      return d.sleep !== undefined ? { op: (0.22 + 0.78 * d.sleep / 100).toFixed(2), t: d.sleep, n: d.sleep } : null; }, avg0);
     html += line("CPAP", "var(--violet)", "v", function (d) {
       if (d.cpap === undefined) return null;
       /* zero is a night the machine was not used. At the old opacity ramp it
@@ -2142,24 +2152,6 @@
          night — when it is the one CPAP value worth seeing across a month. */
       if (d.cpap === 0) return { op: 1, t: "0 — missed", n: 0, cls: "gap" };
       return { op: (0.22 + 0.78 * d.cpap / 100).toFixed(2), t: d.cpap, n: d.cpap }; }, avg0);
-    html += line("HRV", "var(--violet)", "v", function (d) {
-      return d.hrv !== undefined ? { op: (0.22 + 0.78 * d.hrv / 100).toFixed(2), t: d.hrv + " ms", n: d.hrv } : null; }, avg0);
-    html += line("HR", "var(--violet)", "v", function (d) {
-      return d.hr !== undefined ? { op: (0.22 + 0.78 * (d.hr - 35) / 90).toFixed(2), t: d.hr + " bpm", n: d.hr } : null; }, avg0);
-    html += line("AHR", "var(--violet)", "v", function (d) {
-      return d.avgHr !== undefined ? { op: (0.22 + 0.78 * (d.avgHr - 35) / 90).toFixed(2), t: d.avgHr + " bpm", n: d.avgHr } : null; }, avg0);
-    html += line("DEEP", "var(--violet)", "v", function (d) {
-      return d.deepSleep !== undefined
-        ? { op: (0.22 + 0.78 * Math.min(1, d.deepSleep / 120)).toFixed(2), t: d.deepSleep + " min", n: d.deepSleep }
-        : null; }, avg0);
-    html += line("REM", "var(--violet)", "v", function (d) {
-      return d.remSleep !== undefined
-        ? { op: (0.22 + 0.78 * Math.min(1, d.remSleep / 200)).toFixed(2), t: d.remSleep + " min", n: d.remSleep }
-        : null; }, avg0);
-    html += line("LITE", "var(--violet)", "v", function (d) {
-      return d.lightSleep !== undefined
-        ? { op: (0.22 + 0.78 * Math.min(1, d.lightSleep / 360)).toFixed(2), t: d.lightSleep + " min", n: d.lightSleep }
-        : null; }, avg0);
 
     html += '<div class="grid-axis"><span class="grid-label"></span>';
     dates.forEach(function (k) {
