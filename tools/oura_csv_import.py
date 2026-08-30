@@ -125,7 +125,12 @@ def readings(csv_path, warn):
     return out, thin
 
 
-def merge(seed, ring):
+def merge(seed, ring, overwrite=False):
+    """overwrite=False (the default) is the oura_sync.py rule: a field a day
+       already carries without an `_o` flag on it is something typed by hand,
+       and is only ever reported as skipped. overwrite=True is an explicit,
+       one-time exception to that rule -- the CSV wins even over a hand-typed
+       value -- for when the person the data belongs to says so."""
     days = seed.setdefault("days", {})
     changes, skipped = [], []
     now = int(datetime.datetime.now().timestamp() * 1000)
@@ -138,7 +143,7 @@ def merge(seed, ring):
             if field not in ring[day]:
                 continue
             new = ring[day][field]
-            if field in rec and field not in owned:
+            if field in rec and field not in owned and not overwrite:
                 if rec[field] != new:
                     skipped.append("%s %s: yours %s, csv says %s" % (day, field, rec[field], new))
                 continue
@@ -162,16 +167,19 @@ def main():
     ap.add_argument("--seed", required=True)
     ap.add_argument("--out")
     ap.add_argument("--write", action="store_true")
+    ap.add_argument("--overwrite", action="store_true",
+                     help="the CSV wins even over a hand-typed value already on the day")
     args = ap.parse_args()
 
     warn = []
     ring, thin = readings(args.csv, warn)
     seed = json.load(io.open(args.seed, encoding="utf-8"))
-    seed, changes, skipped = merge(seed, ring)
+    seed, changes, skipped = merge(seed, ring, overwrite=args.overwrite)
 
     touched_days = {c.split(" ", 1)[0] for c in changes}
-    print("%d night(s) in the CSV, %d day(s) touched, %d field(s) skipped as hand-entered"
-          % (len(ring), len(touched_days), len(skipped)))
+    print("%d night(s) in the CSV, %d day(s) touched%s"
+          % (len(ring), len(touched_days),
+             ", %d field(s) skipped as hand-entered" % len(skipped) if not args.overwrite else " (overwrite: on)"))
     if warn:
         print("\nclamped or duplicate:")
         for w in warn:

@@ -823,10 +823,14 @@
   };
 
   var OUTCOMES = [
-    { v: "energy", label: "Energy", dp: 1, unit: "pts" },
-    { v: "mood",   label: "Mood",   dp: 1, unit: "pts" },
-    { v: "work",   label: "Work",   dp: 1, unit: "pts" },
-    { v: "sleep",  label: "Sleep",  dp: 0, unit: "pts" }
+    { v: "energy",      label: "Energy",     dp: 1, unit: "pts" },
+    { v: "mood",        label: "Mood",       dp: 1, unit: "pts" },
+    { v: "work",        label: "Work",       dp: 1, unit: "pts" },
+    { v: "sleep",       label: "Sleep",      dp: 0, unit: "pts" },
+    { v: "avgHr",       label: "Avg HR",     dp: 0, unit: "bpm" },
+    { v: "deepSleep",   label: "Deep Sleep", dp: 0, unit: "min" },
+    { v: "remSleep",    label: "REM Sleep",  dp: 0, unit: "min" },
+    { v: "lightSleep",  label: "Light Sleep",dp: 0, unit: "min" }
   ];
   var TIMINGS = [{ v: 0, label: "Same Day" }, { v: 1, label: "Next Day" }];
 
@@ -849,6 +853,19 @@
       get: function (d) { return d.hrv === undefined ? null : d.hrv; } },
     { label: "Heart Rate",             dp: 0, unit: " bpm", move: 4,   good: "down",
       get: function (d) { return d.hr === undefined ? null : d.hr; } },
+    { label: "Average Resting Heart Rate", dp: 0, unit: " bpm", move: 4,  good: "down",
+      get: function (d) { return d.avgHr === undefined ? null : d.avgHr; } },
+    { label: "Deep Sleep",             dp: 0, unit: " min", move: 10,  good: "up",
+      get: function (d) { return d.deepSleep === undefined ? null : d.deepSleep; } },
+    { label: "REM Sleep",              dp: 0, unit: " min", move: 15,  good: "up",
+      get: function (d) { return d.remSleep === undefined ? null : d.remSleep; } },
+    /* Light sleep is the stage least clearly "good" either direction, since a
+       rise can mean either more total sleep (fine) or the same night growing
+       lighter and less restorative (not). Coded as a fall being the flag, on
+       the same logic as the others: a shift is worth a look either way, and
+       this is the direction more often reported as the concerning one. */
+    { label: "Light Sleep",            dp: 0, unit: " min", move: 30,  good: "down",
+      get: function (d) { return d.lightSleep === undefined ? null : d.lightSleep; } },
     /* Doses read as average mg per logged day, so a rise catches taking the
        same amount more often as well as taking more at a time. Days with none
        count as 0; the flag stays quiet until there are a few real doses. */
@@ -1603,7 +1620,10 @@
     if (which === "energy") return avgEnergy(d);
     if (which === "mood") return fluNum(d.mood);
     if (which === "work") return ratingNum(d.work);
-    return d.sleep === undefined ? null : d.sleep;
+    if (which === "avgHr" || which === "deepSleep" || which === "remSleep" || which === "lightSleep") {
+      return d[which] === undefined ? null : d[which];
+    }
+    return d.sleep === undefined ? null : d.sleep;    // "sleep" and the default
   }
   function esc(s) {
     return String(s).replace(/[&<>"]/g, function (c) {
@@ -2093,6 +2113,20 @@
       return d.hrv !== undefined ? { op: (0.22 + 0.78 * d.hrv / 100).toFixed(2), t: d.hrv + " ms", n: d.hrv } : null; }, avg0);
     html += line("HR", "var(--violet)", "v", function (d) {
       return d.hr !== undefined ? { op: (0.22 + 0.78 * (d.hr - 35) / 90).toFixed(2), t: d.hr + " bpm", n: d.hr } : null; }, avg0);
+    html += line("AHR", "var(--violet)", "v", function (d) {
+      return d.avgHr !== undefined ? { op: (0.22 + 0.78 * (d.avgHr - 35) / 90).toFixed(2), t: d.avgHr + " bpm", n: d.avgHr } : null; }, avg0);
+    html += line("DEEP", "var(--violet)", "v", function (d) {
+      return d.deepSleep !== undefined
+        ? { op: (0.22 + 0.78 * Math.min(1, d.deepSleep / 120)).toFixed(2), t: d.deepSleep + " min", n: d.deepSleep }
+        : null; }, avg0);
+    html += line("REM", "var(--violet)", "v", function (d) {
+      return d.remSleep !== undefined
+        ? { op: (0.22 + 0.78 * Math.min(1, d.remSleep / 200)).toFixed(2), t: d.remSleep + " min", n: d.remSleep }
+        : null; }, avg0);
+    html += line("LITE", "var(--violet)", "v", function (d) {
+      return d.lightSleep !== undefined
+        ? { op: (0.22 + 0.78 * Math.min(1, d.lightSleep / 360)).toFixed(2), t: d.lightSleep + " min", n: d.lightSleep }
+        : null; }, avg0);
 
     html += '<div class="grid-axis"><span class="grid-label"></span>';
     dates.forEach(function (k) {

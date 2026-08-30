@@ -107,6 +107,16 @@ class TestMerge(unittest.TestCase):
                           "a field the ring owns can be corrected by the ring")
         self.assertEqual(skipped, [])
 
+    def test_overwrite_flag_replaces_a_hand_typed_value(self):
+        seed = {"days": {"2026-01-08": {"bed": "22:15"}}}
+        ring = {"2026-01-08": {"bed": "22:00", "sleep": 60}}
+        seed, changes, skipped = m.merge(seed, ring, overwrite=True)
+        rec = seed["days"]["2026-01-08"]
+        self.assertEqual(rec["bed"], "22:00", "overwrite=True lets the CSV win even here")
+        self.assertEqual(rec["sleep"], 60)
+        self.assertEqual(skipped, [], "nothing is reported as skipped when overwrite is on")
+        self.assertIn("bed", rec["_o"], "the overwritten field is now ring-owned")
+
     def test_a_cpap_only_day_keeps_cpap_and_gains_the_rest(self):
         seed = {"days": {"2026-01-07": {"cpap": 82}}}
         ring = {"2026-01-07": {"sleep": 70, "hr": 55}}

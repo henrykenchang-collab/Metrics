@@ -50,11 +50,33 @@ setTimeout(() => {
   const line = copied.split("\n").find(l => l.indexOf(TODAY) === 0) || "";
   ok(/,58,35,90,600,/.test(line), "and the values land in the row: " + line);
 
+  console.log("\n-- month grid, Patterns and guardrail trends --");
+  const gl = [...c.w.document.getElementById("grid").querySelectorAll(".grid-label")].map(e => e.textContent);
+  ok(gl.includes("AHR") && gl.includes("DEEP") && gl.includes("REM") && gl.includes("LITE"),
+     "all four have their own month-grid row: " + gl.join(","));
+  const rules = c.w.document.getElementById("grid").querySelectorAll(".grid-rule").length;
+  ok(rules === 2, "no new divider -- they join the existing biometrics block");
+  const outBtns = [...c.w.document.getElementById("outcome").children].map(b => b.textContent);
+  ok(["Avg HR", "Deep Sleep", "REM Sleep", "Light Sleep"].every(l => outBtns.includes(l)),
+     "all four are pickable as a Patterns outcome: " + outBtns.join(" | "));
+  outBtns.find((l, i) => l === "Deep Sleep" && (c.w.document.getElementById("outcome").children[i].dispatchEvent(
+    new c.w.MouseEvent("click", { bubbles: true })), true));
+  ok(!/NaN/.test(c.w.document.getElementById("facts").innerHTML), "switching to it renders without NaN");
+
   console.log("\n-- an existing day with only the original four still reads --");
   const c2 = open({ "dailyReadout.v1": JSON.stringify({ [TODAY]: { sleep: 70, hr: 55, hrv: 40, cpap: 88, _t: 1 } }) });
   const cells2 = [...c2.w.document.querySelectorAll("#stats2 .stat input")];
   ok(cells2.every(i => i.value === ""), "the new fields start blank, not zero or NaN, on an old day");
   ok(!/NaN/.test(c2.w.document.getElementById("grid").innerHTML), "and the grid stays clean");
+
+  console.log("\n-- a guardrail trend fires for one of the new fields --");
+  const shift = (k, n) => { const p = k.split("-"); const d = new Date(+p[0], +p[1] - 1, +p[2]); d.setDate(d.getDate() + n); return iso(d); };
+  const seed = {};
+  for (let i = 0; i < 7; i++) seed[shift(TODAY, -i)] = { avgHr: 75, vitamins: true, _t: 1 };       // recent week: high
+  for (let i = 7; i < 14; i++) seed[shift(TODAY, -i)] = { avgHr: 60, vitamins: true, _t: 1 };      // prior week: low
+  const c3 = open({ "dailyReadout.v1": JSON.stringify(seed) });
+  ok(/Average Resting Heart Rate/.test(c3.w.document.getElementById("guard").textContent),
+     "a 15 bpm rise over the week trips the guardrail");
 
   console.log(fail ? "\n" + fail + " FAILED" : "\nall passed");
   process.exit(fail ? 1 : 0);
