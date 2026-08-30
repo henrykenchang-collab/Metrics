@@ -8,3 +8,5 @@ oura.json
 publish.html
 live-seed.json
 node_modules/
+__pycache__/
+*.pyc

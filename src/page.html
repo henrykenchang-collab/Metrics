@@ -255,6 +255,9 @@
   /* Four across in one row rather than two by two: the same four numbers in
      half the height, which is most of what this panel was spending. */
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); margin-top: 10px; border-top: 1px solid var(--line); }
+  /* a second row of the same cells, immediately under the first, so only
+     one top border is needed between the two */
+  .stats.stats-2 { margin-top: 0; }
 
   /* one line per dose, sized like a marker row rather than a stat cell */
   .doses { border-top: 1px solid var(--line); }
@@ -593,6 +596,7 @@
       <label class="field"><span class="code">Wake Time</span><input class="timein" type="time" id="wake"></label>
     </div>
     <div class="stats" id="stats"></div>
+    <div class="stats stats-2" id="stats2"></div>
   </section>
 
   <section class="panel">
@@ -725,6 +729,17 @@
     { key: "hr",    label: "Heart Rate",             short: "Rest HR", min: 35, max: 125, unit: "bpm" },
     { key: "hrv",   label: "Heart Rate Variability", short: "HRV",     min: 0,  max: 100, unit: "ms" },
     { key: "cpap",  label: "CPAP Score",             short: "CPAP",    min: 0,  max: 100, unit: "/100" }
+  ];
+
+  /* From the Oura export, not the API pull: the ring reports both an average
+     and a lowest resting heart rate, and `hr` above already means the lower
+     one -- avgHr is the other half, not a duplicate. Deep/REM/Light are
+     sleep-stage minutes, the three of which sum to roughly the night's total. */
+  var STATS2 = [
+    { key: "avgHr",      label: "Average Resting Heart Rate", short: "Avg HR", min: 35, max: 125, unit: "bpm" },
+    { key: "deepSleep",  label: "Deep Sleep",                 short: "Deep",   min: 0,  max: 300, unit: "min" },
+    { key: "remSleep",   label: "REM Sleep",                  short: "REM",    min: 0,  max: 300, unit: "min" },
+    { key: "lightSleep", label: "Light Sleep",                short: "Light",  min: 0,  max: 600, unit: "min" }
   ];
 
   /* Quantified intakes — same family as the markers (things you take),
@@ -1146,6 +1161,7 @@
      ============================================================ */
   var statNodes = {};
   buildNumericFields(STATS, "stats");
+  buildNumericFields(STATS2, "stats2");
   buildNumericFields(EXTRAS, "extras", true);
   (function () {
     var wrap = document.createElement("label");
@@ -1885,7 +1901,7 @@
       }
     });
 
-    STATS.concat(EXTRAS).forEach(function (s) {
+    STATS.concat(STATS2).concat(EXTRAS).forEach(function (s) {
       var n = statNodes[s.key], v = d[s.key];
       n.input.value = (v === undefined || v === null) ? "" : v;
       paintGauge(s, n.fill, v === undefined ? null : v);
@@ -2235,7 +2251,7 @@
     var head = ["Date", "Weekday"]
       .concat(MARKERS.map(markerLabel))
       .concat(["Bed Time", "Wake Time", "Time in Bed"])
-      .concat(STATS.map(function (s) { return s.label; }))
+      .concat(STATS.concat(STATS2).map(function (s) { return s.label; }))
       .concat(EXTRAS.map(function (x) { return x.label + " (mg)"; }))
       .concat(["Refill Date", "IR Days Left", "XR Days Left"])
       .concat(ENERGY.map(function (e) { return "Energy " + e.sub; }))
@@ -2252,7 +2268,7 @@
           return d[m.key] ? "Yes" : (isDue(m, k) ? "No" : "N/A");   // N/A = not scheduled that weekday
         }))
         .concat([d.bed || "", d.wake || "", bedM === null ? "" : hm(bedM)])
-        .concat(STATS.map(function (s) { return d[s.key] === undefined ? "" : d[s.key]; }))
+        .concat(STATS.concat(STATS2).map(function (s) { return d[s.key] === undefined ? "" : d[s.key]; }))
         .concat(EXTRAS.map(function (x) { return d[x.key] === undefined ? "" : d[x.key]; }))
         .concat([d.refill || "",
                  daysLeftAt(k, IR_DAYS),
