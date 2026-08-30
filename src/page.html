@@ -140,6 +140,35 @@
   .today-btn { display: inline-block; margin-top: 3px; color: var(--ink-3); border-bottom: 1px dashed var(--line-2); }
   .today-btn[hidden] { display: none; }
 
+  /* ---------------- trend charts view ---------------- */
+  #chartsView { display: flex; flex-direction: column; gap: 13px; }
+  #chartsView .head { justify-content: space-between; }
+  .chartsTitle { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+
+  .trend-chart {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 16px; box-shadow: var(--shadow); padding: 13px 16px 10px;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .tc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+  .tc-name { font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; }
+  .tc-range { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .tc-svg { width: 100%; height: auto; display: block; overflow: visible; touch-action: pan-y; }
+  .tc-line { fill: none; stroke: var(--violet); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .tc-axis { stroke: var(--line); stroke-width: 1; }
+  .tc-tick { font-family: var(--mono); font-size: 8.5px; fill: var(--ink-3); }
+  .tc-cross { stroke: var(--line-2); stroke-width: 1; stroke-dasharray: 2 2; }
+  .tc-dot { fill: var(--violet); stroke: var(--surface); stroke-width: 1.5; }
+  .tc-tooltip {
+    position: absolute; pointer-events: none; z-index: 5;
+    background: var(--ink); color: var(--bg); font-size: 11px; line-height: 1.4;
+    padding: 5px 8px; border-radius: 7px; white-space: nowrap;
+    transform: translate(-50%, -100%); margin-top: -8px; opacity: 0; transition: opacity .1s ease;
+  }
+  .tc-tooltip.show { opacity: 1; }
+  .tc-tooltip b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .tc-wrap { position: relative; }
+
   /* ---------------- readout ---------------- */
   .readout {
     background: var(--surface); border: 1px solid var(--line);
@@ -151,7 +180,11 @@
   .score-n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 40px; font-weight: 700; line-height: 1; letter-spacing: -.04em; }
   .score-d { font-family: var(--mono); font-size: 16px; color: var(--ink-3); font-weight: 500; }
   .readout-meta { flex: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .readout-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
   .readout-label { color: var(--ink-3); }
+  /* the same understated link treatment as "Back to Today" — a way out of
+     the current view, not an action taken on it */
+  .viewlink { flex: none; color: var(--ink-3); border-bottom: 1px dashed var(--line-2); }
   .bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
   .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width .3s cubic-bezier(.2,.7,.3,1); }
   .readout-note { color: var(--ink-2); font-size: 12.5px; }
@@ -553,6 +586,8 @@
 
 <div class="shell">
 
+<div id="dailyView">
+
   <header class="head">
     <button class="shuttle" id="prev" aria-label="Previous Day">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
@@ -571,7 +606,10 @@
     <div class="readout-top">
       <div class="score"><span class="score-n" id="scoreN">0</span><span class="score-d" id="scoreD">/0</span></div>
       <div class="readout-meta">
-        <span class="code readout-label">Markers Due Today</span>
+        <div class="readout-label-row">
+          <span class="code readout-label">Markers Due Today</span>
+          <button class="code viewlink" id="chartsLink" type="button">Trend Charts →</button>
+        </div>
         <div class="bar"><i id="scoreBar" style="width:0%"></i></div>
         <span class="readout-note" id="note">Nothing logged yet.</span>
       </div>
@@ -686,6 +724,17 @@
   <p class="tip">Kept on this device and synced to your Claude account, so a day logged here shows up on your laptop and iPhone.
     <br>Open it from <b>Claude</b> on each device for that. A Home Screen copy still logs, but saves to that
     phone alone — the line above always says which one you are in.</p>
+
+</div>
+
+<div id="chartsView" hidden>
+  <header class="head">
+    <span class="code chartsTitle">Trend Charts</span>
+    <button class="code viewlink" id="backToDaily" type="button">← Daily Readout</button>
+  </header>
+  <div id="trendCharts"></div>
+</div>
+
 </div>
 
 <div class="toast" id="toast"></div>
@@ -2255,6 +2304,113 @@
       'travel together are indistinguishable here. Treat a large bar as a question worth testing, not an answer.</p>';
     host.innerHTML = html;
   }
+
+  /* ============================================================
+     Trend Charts — a second view, not a panel. Sleep, HRV, Avg HR and
+     CPAP each get their own small chart rather than four lines sharing
+     one axis: 0-100 and 35-125 bpm on the same scale would flatten
+     whichever measure has the narrower range. All four still share the
+     same date range, so they stay comparable at a glance.
+     ============================================================ */
+  var TREND_CHARTS = [
+    { key: "sleep", label: "Sleep Score" },
+    { key: "hrv",   label: "Heart Rate Variability", unit: " ms" },
+    { key: "avgHr", label: "Average Resting Heart Rate", unit: " bpm" },
+    { key: "cpap",  label: "CPAP Score" }
+  ];
+
+  function buildTrendChart(spec) {
+    var pts = Object.keys(data).sort().filter(function (k) {
+      return typeof data[k][spec.key] === "number";
+    }).map(function (k) { return { k: k, v: data[k][spec.key] }; });
+
+    var wrap = document.createElement("div");
+    wrap.className = "trend-chart";
+
+    if (pts.length < 2) {
+      wrap.innerHTML = '<div class="tc-head"><span class="tc-name">' + esc(spec.label) + '</span></div>' +
+        '<p class="empty">Not enough logged nights yet for a trend.</p>';
+      return wrap;
+    }
+
+    var first = pts[0].k, last = pts[pts.length - 1].k;
+    var vals = pts.map(function (p) { return p.v; });
+    var vMin = Math.min.apply(null, vals), vMax = Math.max.apply(null, vals);
+    if (vMin === vMax) { vMin -= 1; vMax += 1; }        // a flat line still needs a range to sit in
+    var pad = (vMax - vMin) * 0.12;
+    vMin -= pad; vMax += pad;
+
+    var W = 320, H = 110, PAD_L = 2, PAD_R = 2, PAD_T = 6, PAD_B = 6;
+    var t0 = fromISO(first).getTime(), span = Math.max(1, fromISO(last).getTime() - t0);
+
+    function xAt(k) { return PAD_L + (fromISO(k).getTime() - t0) / span * (W - PAD_L - PAD_R); }
+    function yAt(v) { return H - PAD_B - (v - vMin) / (vMax - vMin) * (H - PAD_T - PAD_B); }
+
+    var d = pts.map(function (p, i) { return (i ? "L" : "M") + xAt(p.k).toFixed(1) + "," + yAt(p.v).toFixed(1); }).join(" ");
+    var dots = pts.map(function (p) {
+      return '<circle class="tc-dot" cx="' + xAt(p.k).toFixed(1) + '" cy="' + yAt(p.v).toFixed(1) + '" r="1.6"></circle>';
+    }).join("");
+
+    wrap.innerHTML =
+      '<div class="tc-head"><span class="tc-name">' + esc(spec.label) + '</span>' +
+        '<span class="tc-range">' + shortDate(first) + ' – ' + shortDate(last) + '</span></div>' +
+      '<div class="tc-wrap">' +
+        '<svg class="tc-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+          '<line class="tc-axis" x1="0" y1="' + (H - PAD_B) + '" x2="' + W + '" y2="' + (H - PAD_B) + '"></line>' +
+          '<path class="tc-line" d="' + d + '"></path>' +
+          dots +
+          '<line class="tc-cross" x1="0" y1="0" x2="0" y2="' + H + '" style="opacity:0"></line>' +
+        '</svg>' +
+        '<div class="tc-tooltip"></div>' +
+      '</div>';
+
+    var svg = wrap.querySelector(".tc-svg"), cross = wrap.querySelector(".tc-cross"), tip = wrap.querySelector(".tc-tooltip");
+
+    function nearest(clientX, rect) {
+      var frac = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+      var x = frac * W, best = pts[0], bestDist = Infinity;
+      pts.forEach(function (p) {
+        var dist = Math.abs(xAt(p.k) - x);
+        if (dist < bestDist) { bestDist = dist; best = p; }
+      });
+      return best;
+    }
+    function showAt(clientX) {
+      var rect = svg.getBoundingClientRect(), p = nearest(clientX, rect);
+      var px = xAt(p.k), py = yAt(p.v);
+      cross.setAttribute("x1", px); cross.setAttribute("x2", px);
+      cross.style.opacity = 1;
+      tip.innerHTML = shortDate(p.k) + ' <b>' + p.v + (spec.unit || "") + '</b>';
+      tip.style.left = (px / W * rect.width) + "px";
+      tip.style.top = (py / H * rect.height) + "px";
+      tip.classList.add("show");
+    }
+    function hide() { cross.style.opacity = 0; tip.classList.remove("show"); }
+
+    svg.addEventListener("mousemove", function (e) { showAt(e.clientX); });
+    svg.addEventListener("mouseleave", hide);
+    svg.addEventListener("touchstart", function (e) { showAt(e.touches[0].clientX); }, { passive: true });
+    svg.addEventListener("touchmove", function (e) { showAt(e.touches[0].clientX); }, { passive: true });
+    svg.addEventListener("touchend", hide);
+
+    return wrap;
+  }
+
+  function renderTrendCharts() {
+    var host = $("trendCharts");
+    host.innerHTML = "";
+    TREND_CHARTS.forEach(function (spec) { host.appendChild(buildTrendChart(spec)); });
+  }
+
+  $("chartsLink").addEventListener("click", function () {
+    $("dailyView").hidden = true;
+    $("chartsView").hidden = false;
+    renderTrendCharts();
+  });
+  $("backToDaily").addEventListener("click", function () {
+    $("chartsView").hidden = true;
+    $("dailyView").hidden = false;
+  });
 
   /* ============================================================
      Navigation
