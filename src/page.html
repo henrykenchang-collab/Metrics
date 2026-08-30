@@ -154,11 +154,14 @@
   .tc-name { font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; }
   .tc-range { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
   .tc-svg { width: 100%; height: auto; display: block; overflow: visible; touch-action: pan-y; }
-  .tc-line { fill: none; stroke: var(--violet); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  /* Thin and small on purpose: at up to ~300 points across one small chart,
+     a bold line and full-size dots read as noise rather than a trend --
+     shrinking both is what makes the shape underneath legible. */
+  .tc-line { fill: none; stroke: var(--violet); stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
   .tc-axis { stroke: var(--line); stroke-width: 1; }
   .tc-tick { font-family: var(--mono); font-size: 8.5px; fill: var(--ink-3); }
   .tc-cross { stroke: var(--line-2); stroke-width: 1; stroke-dasharray: 2 2; }
-  .tc-dot { fill: var(--violet); stroke: var(--surface); stroke-width: 1.5; }
+  .tc-dot { fill: var(--violet); opacity: .55; }
   .tc-tooltip {
     position: absolute; pointer-events: none; z-index: 5;
     background: var(--ink); color: var(--bg); font-size: 11px; line-height: 1.4;
@@ -2348,7 +2351,7 @@
 
     var d = pts.map(function (p, i) { return (i ? "L" : "M") + xAt(p.k).toFixed(1) + "," + yAt(p.v).toFixed(1); }).join(" ");
     var dots = pts.map(function (p) {
-      return '<circle class="tc-dot" cx="' + xAt(p.k).toFixed(1) + '" cy="' + yAt(p.v).toFixed(1) + '" r="1.6"></circle>';
+      return '<circle class="tc-dot" cx="' + xAt(p.k).toFixed(1) + '" cy="' + yAt(p.v).toFixed(1) + '" r="0.9"></circle>';
     }).join("");
 
     wrap.innerHTML =
