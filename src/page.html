@@ -165,6 +165,13 @@
   .tc-tick { font-family: var(--mono); font-size: 8.5px; fill: var(--ink-3); }
   .tc-cross { stroke: var(--line-2); stroke-width: 1; stroke-dasharray: 2 2; }
   .tc-dot { fill: var(--violet); opacity: .7; }
+  /* dashed = a reference line, not a measured one, the same convention the
+     crosshair and "Back to Today" underline already use in this app */
+  .tc-trend { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 3 2; }
+  .tc-label {
+    font-family: var(--mono); font-size: 5.5px; font-variant-numeric: tabular-nums;
+    fill: var(--ink-2); text-anchor: middle;
+  }
   .tc-tooltip {
     position: absolute; pointer-events: none; z-index: 5;
     background: var(--ink); color: var(--bg); font-size: 11px; line-height: 1.4;
@@ -2347,6 +2354,20 @@
     });
   }
 
+  /* Ordinary least squares against the point's position in the series (0, 1,
+     2 …), not against the calendar date: a run of weeks is what the fit
+     should treat as evenly spaced, even though a gap in logging can make two
+     of them land further apart on the calendar than two others. Returns the
+     fitted value at either end, which is all a straight reference line needs. */
+  function linTrend(vals) {
+    var n = vals.length, sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+    for (var i = 0; i < n; i++) { sumX += i; sumY += vals[i]; sumXY += i * vals[i]; sumXX += i * i; }
+    var denom = n * sumXX - sumX * sumX;
+    var m = denom === 0 ? 0 : (n * sumXY - sumX * sumY) / denom;
+    var b = (sumY - m * sumX) / n;
+    return { first: b, last: m * (n - 1) + b };
+  }
+
   function buildTrendChart(spec) {
     var pts = weeklyPoints(spec.key);
 
@@ -2366,7 +2387,9 @@
     var pad = (vMax - vMin) * 0.12;
     vMin -= pad; vMax += pad;
 
-    var W = 320, H = 110, PAD_L = 2, PAD_R = 2, PAD_T = 6, PAD_B = 6;
+    // extra headroom above the data range: the value label sits above its
+    // dot, and without room of its own it would run past the chart's edge
+    var W = 320, H = 122, PAD_L = 2, PAD_R = 2, PAD_T = 16, PAD_B = 6;
     var t0 = fromISO(first).getTime(), span = Math.max(1, fromISO(last).getTime() - t0);
 
     function xAt(k) { return PAD_L + (fromISO(k).getTime() - t0) / span * (W - PAD_L - PAD_R); }
@@ -2376,6 +2399,13 @@
     var dots = pts.map(function (p) {
       return '<circle class="tc-dot" cx="' + xAt(p.k).toFixed(1) + '" cy="' + yAt(p.v).toFixed(1) + '" r="1.4"></circle>';
     }).join("");
+    var labels = pts.map(function (p) {
+      return '<text class="tc-label" x="' + xAt(p.k).toFixed(1) + '" y="' + (yAt(p.v) - 3).toFixed(1) + '">' +
+        Math.round(p.v) + '</text>';
+    }).join("");
+    var fit = linTrend(vals);
+    var trendLine = '<line class="tc-trend" x1="' + xAt(first).toFixed(1) + '" y1="' + yAt(fit.first).toFixed(1) +
+      '" x2="' + xAt(last).toFixed(1) + '" y2="' + yAt(fit.last).toFixed(1) + '"></line>';
 
     wrap.innerHTML =
       '<div class="tc-head"><span class="tc-name">' + esc(spec.label) + '</span>' +
@@ -2384,8 +2414,10 @@
       '<div class="tc-wrap">' +
         '<svg class="tc-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
           '<line class="tc-axis" x1="0" y1="' + (H - PAD_B) + '" x2="' + W + '" y2="' + (H - PAD_B) + '"></line>' +
+          trendLine +
           '<path class="tc-line" d="' + d + '"></path>' +
           dots +
+          labels +
           '<line class="tc-cross" x1="0" y1="0" x2="0" y2="' + H + '" style="opacity:0"></line>' +
         '</svg>' +
         '<div class="tc-tooltip"></div>' +

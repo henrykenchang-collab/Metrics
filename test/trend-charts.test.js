@@ -68,7 +68,21 @@ charts.forEach((el, i) => {
   ok(el.querySelectorAll(".tc-dot").length === 3, names[i] + ": one point per week, not per night: " + el.querySelectorAll(".tc-dot").length);
   ok(el.querySelector(".tc-line").getAttribute("d").startsWith("M"), names[i] + ": a real path, not empty");
   ok(el.querySelector(".tc-agg").textContent === "Weekly average", names[i] + ": labelled as a weekly average");
+  ok(el.querySelectorAll(".tc-label").length === 3, names[i] + ": one value label per point");
+  ok(!!el.querySelector(".tc-trend"), names[i] + ": a fitted trend line is drawn");
 });
+
+console.log("\n-- the value label reads the rounded weekly average, and the trend line fits it --");
+// sleep is 60+w for week w=0 (most recent of the three) through w=2 (oldest),
+// so left-to-right (oldest first) the chart reads 62, 61, 60
+const sleepTrendChart = charts[0];
+const labelText = [...sleepTrendChart.querySelectorAll(".tc-label")].map(t => t.textContent);
+ok(labelText.join(",") === "62,61,60", "labels read the exact weekly averages, oldest week first: " + labelText.join(","));
+const trend = sleepTrendChart.querySelector(".tc-trend");
+const y1 = +trend.getAttribute("y1"), y2 = +trend.getAttribute("y2");
+const dotYs = [...sleepTrendChart.querySelectorAll(".tc-dot")].map(c => +c.getAttribute("cy"));
+ok(Math.abs(y1 - dotYs[0]) < 0.5 && Math.abs(y2 - dotYs[2]) < 0.5,
+   "a perfectly straight run of weeks puts the trend line right through the first and last dot");
 
 console.log("\n-- days within one week collapse to a single averaged point --");
 const monA = weekAgo(0);
