@@ -150,9 +150,12 @@
     border-radius: 16px; box-shadow: var(--shadow); padding: 13px 16px 10px;
     display: flex; flex-direction: column; gap: 2px;
   }
-  .tc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+  .tc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
   .tc-name { font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; }
-  .tc-range { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .tc-range { font-family: var(--mono); font-size: 11px; color: var(--ink-3); flex: none; white-space: nowrap; }
+  /* its own line, so a long metric name never has to compete with the date
+     range for space and wrap unevenly against the shorter chart titles */
+  .tc-agg { display: block; font-size: 10.5px; color: var(--ink-3); margin: 1px 0 4px; }
   .tc-svg { width: 100%; height: auto; display: block; overflow: visible; touch-action: pan-y; }
   /* Thin and small on purpose: at up to ~300 points across one small chart,
      a bold line and full-size dots read as noise rather than a trend --
@@ -161,7 +164,7 @@
   .tc-axis { stroke: var(--line); stroke-width: 1; }
   .tc-tick { font-family: var(--mono); font-size: 8.5px; fill: var(--ink-3); }
   .tc-cross { stroke: var(--line-2); stroke-width: 1; stroke-dasharray: 2 2; }
-  .tc-dot { fill: var(--violet); opacity: .55; }
+  .tc-dot { fill: var(--violet); opacity: .7; }
   .tc-tooltip {
     position: absolute; pointer-events: none; z-index: 5;
     background: var(--ink); color: var(--bg); font-size: 11px; line-height: 1.4;
@@ -2314,6 +2317,14 @@
      one axis: 0-100 and 35-125 bpm on the same scale would flatten
      whichever measure has the narrower range. All four still share the
      same date range, so they stay comparable at a glance.
+
+     Plotted weekly, Monday through Sunday, not per night: a season of
+     nightly noise is a wall of teeth with no pattern in it, and the
+     Monday-Sunday week is the same boundary the IR/XR guardrail already
+     uses, rather than a second definition of "week" for this app to hold.
+     Each point is the mean of whatever nights that week actually have a
+     reading — a week with one night logged still gets a point, just an
+     unaveraged one.
      ============================================================ */
   var TREND_CHARTS = [
     { key: "sleep", label: "Sleep Score" },
@@ -2322,17 +2333,29 @@
     { key: "cpap",  label: "CPAP Score" }
   ];
 
+  function weeklyPoints(key) {
+    var byWeek = {};
+    Object.keys(data).forEach(function (k) {
+      var v = data[k][key];
+      if (typeof v !== "number") return;
+      var wk = weekStart(k);
+      (byWeek[wk] = byWeek[wk] || []).push(v);
+    });
+    return Object.keys(byWeek).sort().map(function (wk) {
+      var vals = byWeek[wk];
+      return { k: wk, v: vals.reduce(function (a, b) { return a + b; }, 0) / vals.length, n: vals.length };
+    });
+  }
+
   function buildTrendChart(spec) {
-    var pts = Object.keys(data).sort().filter(function (k) {
-      return typeof data[k][spec.key] === "number";
-    }).map(function (k) { return { k: k, v: data[k][spec.key] }; });
+    var pts = weeklyPoints(spec.key);
 
     var wrap = document.createElement("div");
     wrap.className = "trend-chart";
 
     if (pts.length < 2) {
       wrap.innerHTML = '<div class="tc-head"><span class="tc-name">' + esc(spec.label) + '</span></div>' +
-        '<p class="empty">Not enough logged nights yet for a trend.</p>';
+        '<p class="empty">Not enough logged weeks yet for a trend.</p>';
       return wrap;
     }
 
@@ -2351,12 +2374,13 @@
 
     var d = pts.map(function (p, i) { return (i ? "L" : "M") + xAt(p.k).toFixed(1) + "," + yAt(p.v).toFixed(1); }).join(" ");
     var dots = pts.map(function (p) {
-      return '<circle class="tc-dot" cx="' + xAt(p.k).toFixed(1) + '" cy="' + yAt(p.v).toFixed(1) + '" r="0.9"></circle>';
+      return '<circle class="tc-dot" cx="' + xAt(p.k).toFixed(1) + '" cy="' + yAt(p.v).toFixed(1) + '" r="1.4"></circle>';
     }).join("");
 
     wrap.innerHTML =
       '<div class="tc-head"><span class="tc-name">' + esc(spec.label) + '</span>' +
         '<span class="tc-range">' + shortDate(first) + ' – ' + shortDate(last) + '</span></div>' +
+      '<span class="tc-agg">Weekly average</span>' +
       '<div class="tc-wrap">' +
         '<svg class="tc-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
           '<line class="tc-axis" x1="0" y1="' + (H - PAD_B) + '" x2="' + W + '" y2="' + (H - PAD_B) + '"></line>' +
@@ -2383,7 +2407,7 @@
       var px = xAt(p.k), py = yAt(p.v);
       cross.setAttribute("x1", px); cross.setAttribute("x2", px);
       cross.style.opacity = 1;
-      tip.innerHTML = shortDate(p.k) + ' <b>' + p.v + (spec.unit || "") + '</b>';
+      tip.innerHTML = "Week of " + shortDate(p.k) + ' <b>' + p.v.toFixed(1) + (spec.unit || "") + '</b>';
       tip.style.left = (px / W * rect.width) + "px";
       tip.style.top = (py / H * rect.height) + "px";
       tip.classList.add("show");
