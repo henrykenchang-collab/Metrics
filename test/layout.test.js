@@ -3,11 +3,11 @@ const HTML=fs.readFileSync("/home/user/Metrics/daily-readout.html","utf8");
 let fail=0; const ok=(c,m)=>{console.log((c?"  PASS  ":"  FAIL  ")+m); if(!c)fail++;};
 const iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 const back=n=>{const d=new Date();d.setDate(d.getDate()-n);return iso(d);};
-function open(jar){jar=jar||{};
+function open(jar,sess){jar=jar||{};sess=sess||{};
   const w=new JSDOM("<!doctype html><html><head><meta charset='utf-8'></head><body>"+HTML+"</body></html>",
    {runScripts:"dangerously",pretendToBeVisual:true,url:"https://a.test/",
     beforeParse(w){w.HTMLCanvasElement.prototype.getContext=()=>null;
-     for(const[n,st]of[["localStorage",jar],["sessionStorage",{}]])
+     for(const[n,st]of[["localStorage",jar],["sessionStorage",sess]])
       Object.defineProperty(w,n,{value:{getItem:k=>(k in st?st[k]:null),
        setItem:(k,v)=>{st[k]=String(v);},removeItem:k=>{delete st[k];}},configurable:true});}}).window;
   return {w,jar};
@@ -17,7 +17,12 @@ const sub=(w,c)=>{const r=[...w.document.getElementById("rows").children]
   const s=r.querySelector(".row-sub"); return s&&s.textContent?s.textContent.trim().replace(/^:\s*/,""):null;};
 
 console.log("\n== 1. Read skips Saturday ==");
-let c=open({});
+const iso2=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const TODAY=iso2(new Date());
+// Read's target varies by weekday (30 Min on Sunday), so this checks the
+// ordinary case on a pinned Monday rather than on whatever "today" is
+const monday=(()=>{const d=new Date();while(d.getDay()!==1)d.setDate(d.getDate()-1);return iso2(d);})();
+let c=open({},{"dailyReadout.cur":JSON.stringify({d:monday,on:TODAY})});
 ok(sub(c.w,"RDG")==="15 Min · Not Sat",'reads "15 Min · Not Sat", got: '+JSON.stringify(sub(c.w,"RDG")));
 ok(sub(c.w,"SAU")==="Sun–Tue","sauna untouched");
 ok(sub(c.w,"GRN")==="Sun · Mon · Wed","greens untouched");
@@ -41,10 +46,10 @@ ok(!/Leave Blank if None/.test(txt),'"Leave Blank if None" gone');
 ok(c.w.document.getElementById("extras").children.length===2,"the two dose fields remain");
 ok(/Extra IR/.test(txt)&&/Extra XR/.test(txt),"each still carries its own label");
 
-console.log("\n== 4. IR Supply condensed and last ==");
+console.log("\n== 4. Vitamin Supply condensed and last ==");
 const panels=[...c.w.document.querySelectorAll("section.panel")];
 const heads=panels.map(p=>p.querySelector(".panel-head .code").textContent);
-ok(heads[heads.length-1]==="IR Supply","IR Supply is the last panel: "+heads.join(" | "));
+ok(heads[heads.length-1]==="Vitamin Supply","Vitamin Supply is the last panel: "+heads.join(" | "));
 ok(heads.indexOf("Patterns")===heads.length-2,"and sits directly under Patterns");
 ok(!!c.w.document.getElementById("supply"),"its inputs came with it");
 

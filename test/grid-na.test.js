@@ -40,12 +40,10 @@ ok(vit.classList.contains("on"),"markers unaffected");
 
 console.log("\n-- styling --");
 const css=HTML.replace(/\s+/g," ");
-ok(/\.sq\.napp \{[^}]*background: var\(--ink\)/.test(css),"painted with the strongest ink token");
-ok(/\.sq\.napp \{[^}]*color: var\(--surface\)/.test(css),"letters take the opposite token, so they stay legible");
+ok(/\.sq\.napp \{[^}]*background: #000/.test(css),"literal black, not theme-relative");
+ok(/\.sq\.napp \{[^}]*color: #fff/.test(css),"literal white letters");
 ok(/\.sq\.napp \{[^}]*font-size: 6px/.test(css),"small letters, as asked");
 ok(/N\/A/.test(c.w.document.querySelector(".legend").textContent),"legend explains it");
-ok(!/#000|black/.test(css.match(/\.sq\.napp \{[^}]*\}/)[0]),
-   "no literal black, which would vanish on the dark theme");
 
 console.log("\n-- IR Supply condensed --");
 c=open({});

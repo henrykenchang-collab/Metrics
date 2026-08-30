@@ -64,7 +64,7 @@ Days merge one at a time, newest write per day winning (`_t` is the per-day
 stamp). Two devices working on different days never cost each other anything;
 the same day on two devices resolves to whichever was written last.
 
-## IR and XR supply
+## Vitamin Supply (IR and XR)
 
 What is left is a matter of the calendar, not of counting: a refill covers a
 fixed run of days, so the date it happened is the only input. `refill` holds
@@ -76,8 +76,13 @@ of the previous refill. Refill on the 1st and IR reads 30 that day, 29 on the
 2nd, 0 on the 31st — which is the **last day it covers**, not the first day
 without. The copy says "lasts through" for exactly that reason.
 
-`IR_DAYS` is 30, `XR_DAYS` 60, and the guardrail speaks at `LOW_DAYS` (7) and
-again on the last day.
+`IR_DAYS` is 30, `XR_DAYS` 60, and the note speaks up at `LOW_DAYS` (7) and
+again on the last day — independently per drug, so a low-but-not-empty side
+still says how many days it has left even while the other reads fine.
+
+The weekly IR/XR balance (Monday–Sunday) and the low-supply warning both live
+under this panel alone now — the top Guardrails banner no longer repeats
+them, so this is the one place to look for either.
 
 `irTaken` and `irFill` are both gone from the interface. Days that carry them
 keep them in storage, unread — nothing written is ever deleted.
@@ -162,3 +167,13 @@ until a digit lands.
 A marker's `days` lists the weekdays it counts on, `0` = Sunday. Days off the
 schedule are never misses, never enter the denominator, and never break a
 streak — so changing a schedule never turns logged history into a miss.
+
+A marker's `since` (an ISO date) treats every day before it the same way: not
+due, so a lapse from before you actually started the habit is never counted
+against you. Sauna carries one, dated to the Monday it entered the routine.
+
+`invert: true` (TH, YT) is for the handful of markers that track something to
+do *less* of. The streak grows on days you leave it alone — blank days
+included — and breaks on the day you tap it; the guardrail's "lapsed" alert
+follows the same flip, firing when the marker is *repeatedly ticked*, not
+when it's repeatedly left untouched.

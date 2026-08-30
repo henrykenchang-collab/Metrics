@@ -332,6 +332,13 @@
   .na-pill { color: var(--ink-3); }
   .na-pill.on { background: var(--ink-3); color: var(--surface); }
   .pill:active { transform: scale(.94); }
+  /* Verbal Fluency reads like Work Productivity's segmented scale — bordered
+     and monospace when off, solid copper when on — rather than the flat
+     Mood pill either side of it. */
+  .pill.flu { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700;
+    border: 1.5px solid var(--line-2); background: transparent; color: var(--ink-3); }
+  .pill.flu.on { background: var(--copper); border-color: var(--copper); color: var(--surface); }
+  .pill.flu.na-pill.on { background: var(--ink-3); border-color: var(--ink-3); }
 
   /* ---------------- markers ---------------- */
   .row {
@@ -427,11 +434,10 @@
   .sq.future { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
   /* not on this marker's schedule — a ghost, so it never reads as a miss */
   .sq.na { background: var(--surface-2); opacity: .3; }
-  /* you said it did not apply: the strongest ink there is, so it separates at a
-     glance from done, missed and never-scheduled. --ink rather than a literal
-     black, or it would vanish into the dark theme's own near-black ground. */
+  /* you said it did not apply: literal black and white, fixed rather than
+     theme-relative, so it reads the same regardless of light or dark mode. */
   .sq.napp {
-    background: var(--ink); color: var(--surface);
+    background: #000; color: #fff;
     display: grid; place-items: center;
     font-family: var(--mono); font-size: 6px; font-weight: 700; letter-spacing: -.03em;
   }
@@ -630,7 +636,7 @@
       <span class="code"><i style="background:var(--copper)"></i>Self-Rated</span>
       <span class="code"><i style="background:var(--violet)"></i>Measured</span>
       <span class="code"><i style="background:var(--neg)"></i>Missed</span>
-      <span class="code"><i style="background:var(--ink)"></i>N/A</span>
+      <span class="code"><i style="background:#000"></i>N/A</span>
       <span class="code"><i class="ghost"></i>Not Scheduled</span>
     </div>
     <p class="gridnote" id="gridnote"></p>
@@ -646,7 +652,7 @@
   </section>
 
   <section class="panel">
-    <div class="panel-head"><span class="code">IR Supply</span><span class="code" id="packHead">No Pack</span></div>
+    <div class="panel-head"><span class="code">Vitamin Supply</span><span class="code" id="packHead">No Pack</span></div>
     <div class="doses tight" id="supply"></div>
     <div id="packBody"></div>
   </section>
@@ -681,19 +687,23 @@
      ============================================================ */
   var MARKERS = [
     { key: "vitamins", code: "VIT", name: "Vitamins" },
-    { key: "sauna",    code: "SAU", name: "Sauna",       days: [0, 1, 2] },
+    /* only recently made part of the routine, so a lapse before this Monday
+       is not a real miss — `since` keeps it out of the streak entirely,
+       the same way an off-schedule weekday already is */
+    { key: "sauna",    code: "SAU", name: "Sauna",       days: [0, 1, 2], since: "2026-08-17" },
     { key: "greens",   code: "GRN", name: "Greens",      days: [0, 1, 3] },
     { key: "keto",     code: "KET", name: "Keto" },
     { key: "plunge",   code: "CLD", name: "Cold Plunge", days: [0, 1, 2, 3, 4, 5] },
     { key: "run",      code: "RUN", name: "Run",         days: [0, 1, 2, 3, 4] },
-    { key: "weights",  code: "WGT", name: "Weights",     days: [0, 1, 2, 5] },
     { key: "gym",      code: "GYM", name: "Gym",         days: [0, 1, 4, 5] },
     // subDays overrides the target on given weekdays (0 = Sunday)
     { key: "read",     code: "RDG", name: "Read", sub: "15 Min",
       days: [0, 1, 2, 3, 4, 5],
       subDays: { 0: "30 Min" }, label: "Read (15/30 Min)" },
-    { key: "th",       code: "TH",  name: "TH" },
-    { key: "yt",       code: "YT",  name: "YT" },
+    /* things to do LESS of: a streak is unbroken while you leave it alone,
+       and breaks the day you tap it */
+    { key: "th",       code: "TH",  name: "TH",  invert: true },
+    { key: "yt",       code: "YT",  name: "YT",  invert: true },
     { key: "walkpm",   code: "WLK", name: "Walk", sub: "PM", days: [0, 1, 2, 3, 4, 5] }
   ];
 
@@ -763,7 +773,7 @@
   var FLU_OP = { bad: 0.34, avg: 0.62, good: 1 };
   var CHOICE_ROWS = [
     { key: "mood",    code: "MOOD", name: "Mood" },
-    { key: "fluency", code: "FLU",  name: "Verbal Fluency", na: true }
+    { key: "fluency", code: "FLU",  name: "Verbal Fluency", na: true, flu: true }
   ];
   function choiceLabel(v) {
     if (v === NA) return "N/A";
@@ -783,7 +793,8 @@
      custom tags via the orphan rule below. Days already carrying them keep
      the label in storage and in the CSV — nothing written is deleted. */
   var RETIRED_TAGS = ["New Supplement", "Late Meal", "Alcohol", "Travel",
-                      "Sore / Injury", "Big Carbs", "Skipped Meal", "Late Screens"];
+                      "Sore / Injury", "Big Carbs", "Skipped Meal", "Late Screens",
+                      "New TH", "Fruits"];
 
   /* Renamed rather than retired, so past days keep the association. */
   var RENAMED_TAGS = {
@@ -936,7 +947,7 @@
   function hm(m) { return Math.floor(m / 60) + "h " + String(m % 60).padStart(2, "0") + "m"; }
 
   /* ---- schedules ---- */
-  function isDue(m, k) { return !m.days || m.days.indexOf(dow(k)) >= 0; }
+  function isDue(m, k) { return (!m.since || k >= m.since) && (!m.days || m.days.indexOf(dow(k)) >= 0); }
 
   function scheduleText(m) {
     if (!m.days || m.days.length === 7) return "";
@@ -1267,7 +1278,7 @@
     var choices = c.na ? FLUENCY.concat([{ v: NA, label: "N/A" }]) : FLUENCY;
     choices.forEach(function (f) {
       var b = document.createElement("button");
-      b.className = "pill" + (f.v === NA ? " na-pill" : "");
+      b.className = "pill" + (c.flu ? " flu" : "") + (f.v === NA ? " na-pill" : "");
       b.type = "button"; b.textContent = f.label;
       b.setAttribute("aria-label", c.name + ": " + f.label);
       b.addEventListener("click", function () {
@@ -1491,28 +1502,35 @@
      Derived — schedules respected throughout
      ============================================================ */
 
-  /* Consecutive DUE days on which the marker was done. Days the marker
+  /* A marker is normally something to DO — a streak grows on the days you
+     did it. `invert` flips that for the handful of things worth doing LESS
+     of (TH, YT): there, doing it is the lapse, and the streak grows on the
+     days you left it alone, blank days included. */
+  function didIt(m, k) { return !!(data[k] && data[k][m.key]); }
+  function onTrack(m, k) { var v = didIt(m, k); return m.invert ? !v : v; }
+
+  /* Consecutive DUE days on which the marker was on track. Days the marker
      isn't scheduled are stepped over, so Saturday never breaks a streak. */
   function streak(m) {
     var n = 0, k = todayISO(), scanned = 0;
-    if (isDue(m, k) && !(data[k] && data[k][m.key])) k = shift(k, -1);  // today still open
+    if (isDue(m, k) && !onTrack(m, k)) k = shift(k, -1);  // today still open
     while (scanned++ < SCAN) {
       if (isDue(m, k)) {
-        if (data[k] && data[k][m.key]) n++; else break;
+        if (onTrack(m, k)) n++; else break;
       }
       k = shift(k, -1);
     }
     return n;
   }
 
-  /* Consecutive DUE, LOGGED days on which the marker was not done.
-     Days with nothing recorded are skipped — not opening the app has
-     its own alert rather than manufacturing eleven false misses. */
+  /* Consecutive DUE, LOGGED days on which the marker was off track. Days
+     with nothing recorded are skipped — not opening the app has its own
+     alert rather than manufacturing eleven false misses. */
   function missStreak(m) {
     var n = 0, k = todayISO(), scanned = 0;
     while (scanned++ < SCAN) {
       if (isDue(m, k) && logged(data[k])) {
-        if (data[k][m.key]) break;
+        if (onTrack(m, k)) break;
         n++;
       }
       k = shift(k, -1);
@@ -1671,6 +1689,17 @@
              '<span class="num pace-v">' + r.left + '/' + r.span + '</span></div>';
     }
 
+    /* Independent per-drug wording, so a low-but-not-empty side still says
+       how many days it has left — this note is now the only place that
+       ever gets said, the top guard having stopped repeating it. */
+    function seg(name, r) {
+      var lasts = "lasts through <b>" + shortDate(r.out) + "</b>";
+      if (r.left <= LOW_DAYS) {
+        return name + " has <b>" + r.left + (r.left === 1 ? " day" : " days") + "</b> left — " + lasts + ".";
+      }
+      return name + " " + lasts + ".";
+    }
+
     var note;
     if (p.ir.left === 0 && p.xr.left === 0) {
       note = "Both are on their last day — <b>IR " + shortDate(p.ir.out) +
@@ -1678,9 +1707,11 @@
     } else if (p.ir.left === 0) {
       note = "IR is on its last day, <b>" + shortDate(p.ir.out) + "</b>. XR has <b>" +
              p.xr.left + " days</b>.";
+    } else if (p.xr.left === 0) {
+      note = "XR is on its last day, <b>" + shortDate(p.xr.out) + "</b>. IR has <b>" +
+             p.ir.left + " days</b>.";
     } else {
-      note = "IR lasts through <b>" + shortDate(p.ir.out) + "</b> · XR through <b>" +
-             shortDate(p.xr.out) + "</b>.";
+      note = seg("IR", p.ir) + " " + seg("XR", p.xr);
     }
 
     host.innerHTML =
@@ -1738,37 +1769,9 @@
       });
     });
 
-    /* A week that is still over with a day or two to run is worth flagging;
-       one that is over on Tuesday is not, because Saturday can still absorb it. */
-    var wkNet = weekNet(todayISO(), "extraIr"), wkLeft = weekDaysLeft(todayISO());
-    if (wkNet !== null && wkNet > 0 && wkLeft <= WEEK_TAIL) {
-      alerts.push({
-        name: "IR This Week",
-        detail: wkLeft === 0
-          ? "The week finished <b>+" + wkNet + " mg</b> above the usual."
-          : "<b>+" + wkNet + " mg</b> above the usual, with only <b>" + wkLeft +
-            (wkLeft === 1 ? " day" : " days") + "</b> left to offset it."
-      });
-    }
-
-    var sp = supplyState();
-    if (sp) {
-      [["IR", sp.ir], ["XR", sp.xr]].forEach(function (pair) {
-        var name = pair[0] + " Supply", r = pair[1];
-        if (r.left === 0) {
-          alerts.push({
-            name: name,
-            detail: "<b>" + shortDate(r.out) + "</b> is the last day this refill covers."
-          });
-        } else if (r.left <= LOW_DAYS) {
-          alerts.push({
-            name: name,
-            detail: "<b>" + r.left + (r.left === 1 ? " day" : " days") + "</b> left — the refill " +
-                    "covers you through <b>" + shortDate(r.out) + "</b>."
-          });
-        }
-      });
-    }
+    /* Weekly IR/XR balance and refill countdown live under Vitamin Supply
+       instead — that panel already carries this same ground (the weekly
+       net line and the days-left note), so it is not repeated up here. */
 
     /* Compliance, collapsed into one row — a line per lapsed marker
        would drown the trend flags, which are the rarer signal. */
@@ -1844,7 +1847,7 @@
     if (hol) $("dow").textContent += " \u00b7 " + hol;
     $("dow").classList.toggle("past", !isToday);
     $("todayBtn").classList.toggle("past", !isToday);
-    $("date").textContent = dt.toLocaleDateString(undefined, { month: "long", day: "numeric" });
+    $("date").textContent = dt.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
     $("todayBtn").hidden = isToday;
     $("next").disabled = isToday;
 

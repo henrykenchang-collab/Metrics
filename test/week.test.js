@@ -24,6 +24,9 @@ function open(jar,cur,fakeToday){
 }
 const guard=w=>w.document.getElementById("guard").textContent.replace(/\s+/g," ");
 const week=w=>{const e=w.document.querySelector(".pack-week");return e?e.textContent.replace(/\s+/g," "):null;};
+// the weekly IR/XR balance lives under Vitamin Supply now, not the top guard —
+// "flagged" means the panel's own line turns red, not a row up top
+const flagged=w=>/over/.test((w.document.querySelector(".pack-week")||{className:""}).className);
 
 // the Monday of the current week, and how many days of it have happened
 const mon=(()=>{const d=new Date();const b=d.getDay()===0?6:d.getDay()-1;d.setDate(d.getDate()-b);return iso(d);})();
@@ -32,42 +35,45 @@ const elapsed=(()=>{const t=new Date(),m=new Date(mon.split("-")[0],mon.split("-
 const leftInWeek=7-elapsed;
 
 console.log("\n-- the week is Monday to Sunday --");
-let w=open({"dailyReadout.v1":JSON.stringify({[mon]:{extraIr:20,_t:1}})});
+// pinned to this week's Wednesday, so there is always room left to offset —
+// otherwise this would flake on any real Sunday, where none is left
+const wed=shift(mon,2);
+let w=open({"dailyReadout.v1":JSON.stringify({[mon]:{extraIr:20,_t:1}})},null,wed);
 ok(week(w)!==null,"a week line appears once there is anything to add up");
 ok(/\+20 mg/.test(week(w)),"the balance reads +20 mg: "+week(w));
 ok(/to offset/.test(week(w)),"and says how long is left to offset it");
 // a day before this Monday must not be counted
-w=open({"dailyReadout.v1":JSON.stringify({[shift(mon,-1)]:{extraIr:40,_t:1},[mon]:{extraIr:20,_t:1}})});
+w=open({"dailyReadout.v1":JSON.stringify({[shift(mon,-1)]:{extraIr:40,_t:1},[mon]:{extraIr:20,_t:1}})},null,wed);
 ok(/\+20 mg/.test(week(w)),"last week's Sunday is not in this week's balance: "+week(w));
 
 console.log("\n-- taking early and giving it back --");
 w=open({"dailyReadout.v1":JSON.stringify({[mon]:{extraIr:20,_t:1},[shift(mon,1)]:{extraIr:-20,_t:1}})});
 ok(/\+?0 mg/.test(week(w)),"two on Monday and none on Tuesday nets to zero: "+week(w));
 ok(!/to offset/.test(week(w)),"nothing left to offset when the week is level");
-ok(!/IR This Week/.test(guard(w)),"and nothing is flagged");
+ok(!flagged(w),"and nothing is flagged");
 
 console.log("\n-- nothing is said while there is still room --");
 // Monday over, with the whole week ahead: quiet
 w=open({"dailyReadout.v1":JSON.stringify({[mon]:{extraIr:20,_t:1}})},mon);
-ok(!/IR This Week/.test(guard(w))||leftInWeek<=2,
+ok(!flagged(w)||leftInWeek<=2,
    "an overage early in the week waits for Saturday rather than nagging on Monday");
 
 console.log("\n-- but it speaks near the end --");
 // pin the clock to a Sunday: the week's last day, one chance left to offset
 const sunday=dayOfWeek(0), itsMonday=shift(sunday,-6);
 w=open({"dailyReadout.v1":JSON.stringify({[itsMonday]:{extraIr:20,_t:1},[sunday]:{keto:true,_t:1}})},null,sunday);
-ok(/IR This Week/.test(guard(w)),"on Sunday, a week still over gets flagged");
-ok(/\+20 mg/.test(guard(w)),"naming the amount: "+(guard(w).match(/IR This Week[^.]*\./)||[""])[0]);
-ok(/week finished/.test(guard(w)),"and that the week is done, not that some days remain");
-ok(/over/.test(w.document.querySelector(".pack-week").className),"the panel line turns too");
+ok(flagged(w),"on Sunday, a week still over gets flagged");
+ok(/\+20 mg/.test(week(w)),"naming the amount: "+week(w));
+ok(/week over/.test(week(w)),"and that the week is done, not that some days remain");
+ok(!/IR This Week|IR Supply|XR Supply/.test(guard(w)),"and none of it repeats in the top guard");
 // the same overage on the Monday itself stays quiet
 w=open({"dailyReadout.v1":JSON.stringify({[itsMonday]:{extraIr:20,_t:1}})},null,itsMonday);
-ok(!/IR This Week/.test(guard(w)),"the identical overage on Monday says nothing — six days can absorb it");
+ok(!flagged(w),"the identical overage on Monday says nothing — six days can absorb it");
 ok(/6 days to offset/.test(week(w)),"it reports the six days after today: "+week(w));
 
 console.log("\n-- a week under the usual is never a problem --");
 w=open({"dailyReadout.v1":JSON.stringify({[itsMonday]:{extraIr:-20,_t:1},[sunday]:{keto:true,_t:1}})},null,sunday);
-ok(!/IR This Week/.test(guard(w)),"being under is not flagged");
+ok(!flagged(w),"being under is not flagged");
 ok(/-20 mg/.test(week(w)),"though the balance still reads: "+week(w));
 
 console.log("\n-- the journal is smaller --");

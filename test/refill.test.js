@@ -49,16 +49,17 @@ d2.value=back(30); d2.dispatchEvent(new c.w.Event("change",{bubbles:true}));
 ok(bars(c)[0]==="IR Supply Left=0/30","exactly 30 days on: IR is empty");
 ok(bars(c)[1]==="XR Supply Left=30/60","XR still has half");
 ok(/IR is on its last day/.test(body(c)),"the note says it is the last covered day");
-ok(/IR Supply/.test(c.w.document.getElementById("guard").textContent),"and the guardrail flags it");
+ok(/over/.test(c.w.document.querySelector("#packBody .pack-note").className),"and the panel note flags it");
+ok(!/IR Supply|XR Supply/.test(c.w.document.getElementById("guard").textContent),
+   "the top guard no longer repeats it — it lives under Vitamin Supply now");
 c=open({}); const d3=c.w.document.getElementById("refillDate");
 d3.value=back(25); d3.dispatchEvent(new c.w.Event("change",{bubbles:true}));
 ok(bars(c)[0]==="IR Supply Left=5/30","five days left");
-ok(/5 days.*left.*covers you through/i.test(c.w.document.getElementById("guard").textContent.replace(/\s+/g," ")),
-   "warned before the last covered day, not after");
+ok(/5 days.*left.*lasts through/i.test(body(c)),"warned before the last covered day, not after");
 c=open({}); const d4=c.w.document.getElementById("refillDate");
 d4.value=TODAY; d4.dispatchEvent(new c.w.Event("change",{bubbles:true}));
 ok(bars(c).join("|")==="IR Supply Left=30/30|XR Supply Left=60/60","refilled today: full");
-ok(!/Supply/.test(c.w.document.getElementById("guard").textContent),"nothing to warn about");
+ok(!/over/.test(c.w.document.querySelector("#packBody .pack-note").className),"nothing to warn about");
 
 console.log("\n-- a later entry corrects an earlier one --");
 c=open({"dailyReadout.v1":JSON.stringify({
