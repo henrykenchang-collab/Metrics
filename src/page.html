@@ -773,9 +773,13 @@
 
   var MEALS = ["Breakfast", "Lunch", "Dinner"];
 
+  /* Built in, so they are on every device and can never be retired by the
+     orphan rule below — unlike a tag added through "+ New Factor", which
+     lives in the synced custom list. Paired where there is a pair: a dose
+     over the usual and a dose skipped are the two halves of one question. */
   var BASE_TAGS = ["Stress", "Poor Sleep", "Sick", "No Keto",
                    "Late Caffeine (10AM)", "Late Gum (12PM)", "Extra Sleep",
-                   "Extra XR/IR"];
+                   "Nap", "Extra XR/IR", "No XR/IR"];
 
   /* Tags dropped from the default set. Listed so they can't come back as
      custom tags via the orphan rule below. Days already carrying them keep
@@ -1052,10 +1056,15 @@
         left orphaned and untoggleable. */
   var migrated = false, tagsDirty = false;
 
-  // a retired label must not survive in customTags, or it reappears as a button
-  var retiredSet = {};
-  RETIRED_TAGS.concat(Object.keys(RENAMED_TAGS)).forEach(function (t) { retiredSet[t.toLowerCase()] = 1; });
-  var keptCustom = customTags.filter(function (t) { return !retiredSet[String(t).toLowerCase()]; });
+  /* Labels that have no business in customTags. A retired one must not
+     survive there or it reappears as a button; a BASE_TAG one is simply
+     redundant, which is what a tag you once added by hand becomes the day
+     it is promoted to built-in. Only the picker entry goes either way —
+     the days already carrying the label keep it, here and in the export. */
+  var redundantTag = {};
+  RETIRED_TAGS.concat(Object.keys(RENAMED_TAGS)).concat(BASE_TAGS)
+    .forEach(function (t) { redundantTag[String(t).toLowerCase()] = 1; });
+  var keptCustom = customTags.filter(function (t) { return !redundantTag[String(t).toLowerCase()]; });
   if (keptCustom.length !== customTags.length) { customTags = keptCustom; tagsDirty = true; }
 
   var canonTag = {};
