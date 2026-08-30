@@ -92,5 +92,13 @@ console.log("\n-- Meals sits under Sleep & Recovery --");
 const heads=[...w.document.querySelectorAll("section.panel .panel-head .code:first-child")].map(e=>e.textContent);
 ok(heads.join(" | ").indexOf("Sleep & Recovery | Meals")>=0,"order: "+heads.join(" | "));
 ok(!!w.document.getElementById("mealAdd"),"and its button came with it");
+
+console.log("\n-- Activity/Steps is gone --");
+ok(heads.indexOf("Activity")<0,"no Activity panel: "+heads.join(" | "));
+ok(!w.document.getElementById("activity"),"and no host element left behind");
+ok(!/STEP/.test(w.document.getElementById("grid").textContent),"no STEP row in the month grid");
+// "steps" still appears in comments about the 8-step rating scale, so match
+// the data field itself rather than the bare word
+ok(!/d\.steps|key: "steps"/.test(HTML),"and no steps field left in the code");
 console.log(fail?"\n"+fail+" FAILED":"\nall passed");
 process.exit(fail?1:0);

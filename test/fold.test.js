@@ -20,7 +20,7 @@ const click=(w,el)=>el.dispatchEvent(new w.MouseEvent("click",{bubbles:true}));
 console.log("\n-- every section folds --");
 let c=open({});
 const ps=panels(c.w);
-ok(ps.length===9,"nine panels: "+ps.map(p=>head(p).querySelector(".code").textContent).join(" | "));
+ok(ps.length===8,"eight panels: "+ps.map(p=>head(p).querySelector(".code").textContent).join(" | "));
 ok(ps.every(p=>body(p)),"each grew a body wrapper");
 ok(ps.every(p=>p.id),"each has an id to remember by");
 ok(ps.every(p=>head(p).querySelector(".chev")),"each head has a chevron");
