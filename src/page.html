@@ -155,7 +155,14 @@
   .tc-range { font-family: var(--mono); font-size: 11px; color: var(--ink-3); flex: none; white-space: nowrap; }
   /* its own line, so a long metric name never has to compete with the date
      range for space and wrap unevenly against the shorter chart titles */
-  .tc-agg { display: block; font-size: 10.5px; color: var(--ink-3); margin: 1px 0 4px; }
+  .tc-sub { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 1px 0 5px; }
+  .tc-agg { font-size: 10.5px; color: var(--ink-3); }
+  .tc-period {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 7px; padding: 3px 5px; flex: none; cursor: pointer;
+  }
+  .tc-period:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .tc-svg { width: 100%; height: auto; display: block; overflow: visible; touch-action: pan-y; }
   /* Thin and small on purpose: at up to ~300 points across one small chart,
      a bold line and full-size dots read as noise rather than a trend --
@@ -229,6 +236,10 @@
     border-bottom: 1px solid var(--line); background: var(--neg-dim);
   }
   .guard-head .n { margin-left: auto; opacity: .8; }
+  .guard-head { cursor: pointer; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  .guard-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .guard-head.shut { border-bottom: 0; }
+  .guard-head.shut .chev { transform: rotate(-90deg); }
   .alert-row { display: flex; gap: 11px; padding: 10px 16px; border-bottom: 1px solid var(--line); align-items: flex-start; }
   .alert-row:last-of-type { border-bottom: 0; }
   .alert-bar { width: 3px; align-self: stretch; border-radius: 2px; background: var(--neg); flex: none; }
@@ -730,7 +741,7 @@
     <div id="facts"></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="vitaminSupply">
     <div class="panel-head"><span class="code">Vitamin Supply</span><span class="code" id="packHead">No Pack</span></div>
     <div class="doses tight" id="supply"></div>
     <div id="packBody"></div>
@@ -1969,18 +1980,64 @@
     return alerts;
   }
 
+  /* ============================================================
+     Folding
+     Which sections are rolled up is a preference, not data: it lives in
+     localStorage beside the log and never enters the seed. One store,
+     shared by the panels and by Guardrails — the panels are wired once at
+     boot, but Guardrails rebuilds its own markup on every render and so
+     has to re-apply the state itself, which is why this lives up here.
+     ============================================================ */
+  var SHUTSTORE = "dailyReadout.shut";
+  var SHUTINIT  = "dailyReadout.shutInit";
+  var DEFAULT_SHUT = ["vitaminSupply"];      // rolled up until you open it
+  var shut = {};
+  try {
+    (JSON.parse(localStorage.getItem(SHUTSTORE) || "[]") || []).forEach(function (id) { shut[id] = 1; });
+  } catch (e) { shut = {}; }
+  /* A default only gets to apply once, to old logs and new alike. After
+     that the section is yours: open it and it stays open next load. */
+  try {
+    if (!localStorage.getItem(SHUTINIT)) {
+      DEFAULT_SHUT.forEach(function (id) { shut[id] = 1; });
+      localStorage.setItem(SHUTSTORE, JSON.stringify(Object.keys(shut)));
+      localStorage.setItem(SHUTINIT, "1");
+    }
+  } catch (e) {}
+
+  function isShut(id) { return !!shut[id]; }
+  function setShut(id, on) {
+    if (on) shut[id] = 1; else delete shut[id];
+    try { localStorage.setItem(SHUTSTORE, JSON.stringify(Object.keys(shut))); } catch (e) {}
+  }
+  var CHEV = '<span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M6 9l6 6 6-6"/></svg></span>';
+
   function renderGuard() {
     var alerts = guardAlerts(), host = $("guard");
     host.classList.toggle("alert", alerts.length > 0);
+    var flags = alerts.length;
 
-    if (!alerts.length) {
-      host.innerHTML = '<div class="guard-clear"><i></i>' +
-        'All clear — nothing missed more than ' + MISS_LIMIT + ' scheduled days running, nothing trending down.</div>';
+    /* A head in both states, so the fold is in the same place whether or
+       not anything is flagged — a control that comes and goes is worse
+       than one that sometimes opens onto good news. */
+    var html = '<div class="guard-head" role="button" tabindex="0">' +
+                 '<span class="code">Guardrails</span>' +
+                 '<span class="code n">' +
+                   (flags ? flags + (flags === 1 ? " Flag" : " Flags") : "No Flags") +
+                 '</span>' + CHEV + '</div>' +
+               '<div class="guard-body">';
+
+    if (!flags) {
+      html += '<div class="guard-clear"><i></i>' +
+        'All clear — nothing missed more than ' + MISS_LIMIT + ' scheduled days running, nothing trending down.</div>' +
+        '</div>';
+      host.innerHTML = html;
+      wireGuardFold(host);
       return;
     }
 
-    var html = '<div class="guard-head"><span class="code">Guardrails</span>' +
-               '<span class="code n">' + alerts.length + (alerts.length === 1 ? " Flag" : " Flags") + '</span></div>';
     alerts.forEach(function (a) {
       html += '<div class="alert-row"><span class="alert-bar"></span><span class="alert-body">' +
                 '<span class="alert-name">' + esc(a.name) + '</span>' +
@@ -1989,8 +2046,27 @@
     });
     html += '<p class="guard-note">Misses count only days a marker is scheduled and you logged. ' +
             'Trends compare the last 7 days against the 7 before, and need at least ' + TREND_MIN +
-            ' readings in each. For heart rate a rise is the flag; for everything else a fall is.</p>';
+            ' readings in each. For heart rate a rise is the flag; for everything else a fall is.</p>' +
+            '</div>';
     host.innerHTML = html;
+    wireGuardFold(host);
+  }
+
+  /* Re-wired on every render, because renderGuard replaces its own markup */
+  function wireGuardFold(host) {
+    var head = host.querySelector(".guard-head"), body = host.querySelector(".guard-body");
+    function paint() {
+      var s = isShut("guard");
+      body.hidden = s;
+      head.classList.toggle("shut", s);
+      head.setAttribute("aria-expanded", s ? "false" : "true");
+    }
+    function toggle() { setShut("guard", !isShut("guard")); paint(); }
+    head.addEventListener("click", toggle);
+    head.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+    });
+    paint();
   }
 
   /* ============================================================
@@ -2365,17 +2441,53 @@
     { key: "cpap",  label: "CPAP Score" }
   ];
 
-  function weeklyPoints(key) {
-    var byWeek = {};
+  /* Each period buckets a day onto the date its period STARTS, so the
+     bucket key is itself a date and the x axis needs no special case:
+     a week is its Monday, a month its 1st, a quarter its first month's
+     1st, a year its January 1st. */
+  function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+  var TREND_PERIODS = [
+    { id: "week", label: "Weekly", agg: "Weekly average", noun: "weeks",
+      at: function (k) { return weekStart(k); },
+      tip: function (k) { return "Week of " + shortDate(k); },
+      range: function (k) { return shortDate(k); } },
+    { id: "month", label: "Monthly", agg: "Monthly average", noun: "months",
+      at: function (k) { return k.slice(0, 8) + "01"; },
+      tip: function (k) { return fromISO(k).toLocaleDateString(undefined, { month: "long", year: "numeric" }); },
+      range: function (k) { return monthYear(k); } },
+    { id: "quarter", label: "Quarterly", agg: "Quarterly average", noun: "quarters",
+      at: function (k) { return k.slice(0, 5) + pad2(Math.floor((+k.slice(5, 7) - 1) / 3) * 3 + 1) + "-01"; },
+      tip: function (k) { return "Q" + (Math.floor((+k.slice(5, 7) - 1) / 3) + 1) + " " + k.slice(0, 4); },
+      range: function (k) { return "Q" + (Math.floor((+k.slice(5, 7) - 1) / 3) + 1) + " " + k.slice(2, 4); } },
+    { id: "year", label: "Yearly", agg: "Yearly average", noun: "years",
+      at: function (k) { return k.slice(0, 4) + "-01-01"; },
+      tip: function (k) { return k.slice(0, 4); },
+      range: function (k) { return k.slice(0, 4); } }
+  ];
+
+  /* Which period each chart is showing is a preference, like a folded
+     panel: remembered, but never part of the log. */
+  var PERIODSTORE = "dailyReadout.trendPeriod";
+  var trendPeriod = {};
+  try { trendPeriod = JSON.parse(localStorage.getItem(PERIODSTORE) || "{}") || {}; } catch (e) { trendPeriod = {}; }
+  function periodFor(key) {
+    for (var i = 0; i < TREND_PERIODS.length; i++) {
+      if (TREND_PERIODS[i].id === trendPeriod[key]) return TREND_PERIODS[i];
+    }
+    return TREND_PERIODS[0];
+  }
+
+  function periodPoints(key, period) {
+    var buckets = {};
     Object.keys(data).forEach(function (k) {
       var v = data[k][key];
       if (typeof v !== "number") return;
-      var wk = weekStart(k);
-      (byWeek[wk] = byWeek[wk] || []).push(v);
+      var b = period.at(k);
+      (buckets[b] = buckets[b] || []).push(v);
     });
-    return Object.keys(byWeek).sort().map(function (wk) {
-      var vals = byWeek[wk];
-      return { k: wk, v: vals.reduce(function (a, b) { return a + b; }, 0) / vals.length, n: vals.length };
+    return Object.keys(buckets).sort().map(function (b) {
+      var vals = buckets[b];
+      return { k: b, v: vals.reduce(function (a, c) { return a + c; }, 0) / vals.length, n: vals.length };
     });
   }
 
@@ -2394,14 +2506,24 @@
   }
 
   function buildTrendChart(spec) {
-    var pts = weeklyPoints(spec.key);
+    var period = periodFor(spec.key);
+    var pts = periodPoints(spec.key, period);
 
     var wrap = document.createElement("div");
     wrap.className = "trend-chart";
 
+    var picker = '<select class="tc-period" aria-label="' + esc(spec.label) + ' period">' +
+      TREND_PERIODS.map(function (p) {
+        return '<option value="' + p.id + '"' + (p.id === period.id ? " selected" : "") + '>' + p.label + '</option>';
+      }).join("") + '</select>';
+
+    /* The picker rides along even with nothing to plot: a period with too
+       little history is exactly when you need to switch back out of it. */
     if (pts.length < 2) {
       wrap.innerHTML = '<div class="tc-head"><span class="tc-name">' + esc(spec.label) + '</span></div>' +
-        '<p class="empty">Not enough logged weeks yet for a trend.</p>';
+        '<div class="tc-sub"><span class="tc-agg">' + period.agg + '</span>' + picker + '</div>' +
+        '<p class="empty">Not enough logged ' + period.noun + ' yet for a trend.</p>';
+      wireTrendPeriod(wrap, spec);
       return wrap;
     }
 
@@ -2466,8 +2588,8 @@
 
     wrap.innerHTML =
       '<div class="tc-head"><span class="tc-name">' + esc(spec.label) + '</span>' +
-        '<span class="tc-range">' + shortDate(first) + ' – ' + shortDate(last) + '</span></div>' +
-      '<span class="tc-agg">Weekly average</span>' +
+        '<span class="tc-range">' + period.range(first) + ' – ' + period.range(last) + '</span></div>' +
+      '<div class="tc-sub"><span class="tc-agg">' + period.agg + '</span>' + picker + '</div>' +
       '<div class="tc-wrap">' +
         '<svg class="tc-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
           '<line class="tc-axis" x1="0" y1="' + (H - PAD_B) + '" x2="' + W + '" y2="' + (H - PAD_B) + '"></line>' +
@@ -2497,7 +2619,7 @@
       var px = xAt(p.k), py = yAt(p.v);
       cross.setAttribute("x1", px); cross.setAttribute("x2", px);
       cross.style.opacity = 1;
-      tip.innerHTML = "Week of " + shortDate(p.k) + ' <b>' + p.v.toFixed(1) + (spec.unit || "") + '</b>';
+      tip.innerHTML = period.tip(p.k) + ' <b>' + p.v.toFixed(1) + (spec.unit || "") + '</b>';
       tip.style.left = (px / W * rect.width) + "px";
       tip.style.top = (py / H * rect.height) + "px";
       tip.classList.add("show");
@@ -2510,7 +2632,21 @@
     svg.addEventListener("touchmove", function (e) { showAt(e.touches[0].clientX); }, { passive: true });
     svg.addEventListener("touchend", hide);
 
+    wireTrendPeriod(wrap, spec);
     return wrap;
+  }
+
+  /* Only the chart whose period changed is rebuilt; the other three keep
+     whatever they were each set to. */
+  function wireTrendPeriod(wrap, spec) {
+    var sel = wrap.querySelector(".tc-period");
+    if (!sel) return;
+    sel.addEventListener("change", function () {
+      trendPeriod[spec.key] = sel.value;
+      try { localStorage.setItem(PERIODSTORE, JSON.stringify(trendPeriod)); } catch (e) {}
+      var fresh = buildTrendChart(spec);
+      wrap.parentNode.replaceChild(fresh, wrap);
+    });
   }
 
   function renderTrendCharts() {
@@ -2826,12 +2962,6 @@
      part of the log: it lives in its own localStorage key so it never
      enters the seed, never syncs, and never counts as a day's content.
      ============================================================ */
-  var SHUTSTORE = "dailyReadout.shut";
-  var shut = {};
-  try {
-    (JSON.parse(localStorage.getItem(SHUTSTORE) || "[]") || []).forEach(function (id) { shut[id] = 1; });
-  } catch (e) { shut = {}; }
-
   [].forEach.call(document.querySelectorAll("section.panel"), function (panel, i) {
     var head = panel.querySelector(".panel-head");
     if (!head) return;
@@ -2846,12 +2976,7 @@
     while (head.nextSibling) body.appendChild(head.nextSibling);
     panel.appendChild(body);
 
-    var chev = document.createElement("span");
-    chev.className = "chev";
-    chev.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-      'stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M6 9l6 6 6-6"/></svg>';
-    head.appendChild(chev);
+    head.insertAdjacentHTML("beforeend", CHEV);
 
     head.setAttribute("role", "button");
     head.setAttribute("tabindex", "0");
@@ -2859,16 +2984,12 @@
     if (name) head.setAttribute("aria-label", name.textContent);
 
     function paint() {
-      var isShut = !!shut[id];
-      body.hidden = isShut;
-      head.classList.toggle("shut", isShut);
-      head.setAttribute("aria-expanded", isShut ? "false" : "true");
+      var s = isShut(id);
+      body.hidden = s;
+      head.classList.toggle("shut", s);
+      head.setAttribute("aria-expanded", s ? "false" : "true");
     }
-    function toggle() {
-      if (shut[id]) delete shut[id]; else shut[id] = 1;
-      try { localStorage.setItem(SHUTSTORE, JSON.stringify(Object.keys(shut))); } catch (e) {}
-      paint();
-    }
+    function toggle() { setShut(id, !isShut(id)); paint(); }
     head.addEventListener("click", toggle);
     head.addEventListener("keydown", function (e) {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }

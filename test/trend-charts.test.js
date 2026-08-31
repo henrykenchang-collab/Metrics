@@ -152,6 +152,87 @@ const sleepChart = [...c.w.document.querySelectorAll(".trend-chart")][0];
 ok(!!sleepChart.querySelector(".empty") && !sleepChart.querySelector(".tc-line"),
    "one point alone shows the empty state rather than a dot with no line");
 
+console.log("\n-- a period picker on every chart --");
+// two years of the first of each month, so every period has enough points
+const many = {};
+for (let y = 2024; y <= 2025; y++) for (let m = 1; m <= 12; m++) {
+  const k = y + "-" + String(m).padStart(2, "0") + "-0";
+  for (let d = 1; d <= 3; d++) many[k + d] = { sleep: 60 + m, hrv: 30 + m, avgHr: 70, cpap: 80, _t: 1 };
+}
+c = open({ "dailyReadout.v1": JSON.stringify(many) });
+click(c.w, c.w.document.getElementById("chartsLink"));
+const withPicker = [...c.w.document.querySelectorAll(".trend-chart")];
+ok(withPicker.every(el => el.querySelector(".tc-period")), "all four carry one");
+const opts = [...withPicker[0].querySelectorAll(".tc-period option")].map(o => o.value + ":" + o.textContent);
+ok(opts.join(" | ") === "week:Weekly | month:Monthly | quarter:Quarterly | year:Yearly",
+   "the four periods, in order: " + opts.join(" | "));
+ok(withPicker[0].querySelector(".tc-period").value === "week", "weekly is the default");
+
+console.log("\n-- switching period re-buckets that chart, and only that one --");
+const sleepEl = () => [...c.w.document.querySelectorAll(".trend-chart")][0];
+const hrvEl = () => [...c.w.document.querySelectorAll(".trend-chart")][1];
+const dotsIn = el => el.querySelectorAll(".tc-dot").length;
+const weekDots = dotsIn(sleepEl()), hrvWeekDots = dotsIn(hrvEl());
+const pick = (el, v) => { const s = el.querySelector(".tc-period"); s.value = v;
+  s.dispatchEvent(new c.w.Event("change", { bubbles: true })); };
+
+pick(sleepEl(), "month");
+ok(dotsIn(sleepEl()) === 24, "monthly gives 24 points over two years: " + dotsIn(sleepEl()));
+ok(sleepEl().querySelector(".tc-agg").textContent === "Monthly average", "and says so");
+ok(dotsIn(hrvEl()) === hrvWeekDots, "the HRV chart beside it is left on weekly");
+
+pick(sleepEl(), "quarter");
+ok(dotsIn(sleepEl()) === 8, "quarterly gives 8: " + dotsIn(sleepEl()));
+ok(sleepEl().querySelector(".tc-agg").textContent === "Quarterly average", "labelled quarterly");
+
+pick(sleepEl(), "year");
+ok(dotsIn(sleepEl()) === 2, "yearly gives 2: " + dotsIn(sleepEl()));
+ok(sleepEl().querySelector(".tc-agg").textContent === "Yearly average", "labelled yearly");
+
+pick(sleepEl(), "week");
+ok(dotsIn(sleepEl()) === weekDots, "and back to weekly returns the original series");
+
+console.log("\n-- the range at the top speaks in the period's own units --");
+// bucket keys are period START dates, so a plain date range would both read
+// as a day and understate the real span ("Nov 1 - Aug 1" for whole months)
+pick(sleepEl(), "month");
+ok(/^\w+ \d\d – \w+ \d\d$/.test(sleepEl().querySelector(".tc-range").textContent),
+   "monthly reads as months: " + sleepEl().querySelector(".tc-range").textContent);
+pick(sleepEl(), "quarter");
+ok(/^Q[1-4] \d\d – Q[1-4] \d\d$/.test(sleepEl().querySelector(".tc-range").textContent),
+   "quarterly reads as quarters: " + sleepEl().querySelector(".tc-range").textContent);
+pick(sleepEl(), "year");
+ok(sleepEl().querySelector(".tc-range").textContent === "2024 – 2025",
+   "yearly reads as years: " + sleepEl().querySelector(".tc-range").textContent);
+pick(sleepEl(), "week");
+ok(/^\w+ \d+ – \w+ \d+$/.test(sleepEl().querySelector(".tc-range").textContent),
+   "weekly still reads as dates: " + sleepEl().querySelector(".tc-range").textContent);
+
+console.log("\n-- the choice is remembered, per chart, and never in the log --");
+pick(sleepEl(), "quarter");
+pick(hrvEl(), "year");
+const stored = JSON.parse(c.jar["dailyReadout.trendPeriod"]);
+ok(stored.sleep === "quarter" && stored.hrv === "year", "stored per metric: " + JSON.stringify(stored));
+ok(!/trendPeriod|quarter/.test(c.jar["dailyReadout.v1"] || ""), "the log is untouched by a view setting");
+const reopened = open(c.jar);
+click(reopened.w, reopened.w.document.getElementById("chartsLink"));
+const back2 = [...reopened.w.document.querySelectorAll(".trend-chart")];
+ok(back2[0].querySelector(".tc-period").value === "quarter" &&
+   back2[1].querySelector(".tc-period").value === "year", "and each comes back where it was left");
+ok(back2[2].querySelector(".tc-period").value === "week", "one never touched is still weekly");
+
+console.log("\n-- a period with too little history still lets you back out --");
+c = open({ "dailyReadout.v1": JSON.stringify({
+  [shift(thisMon, -21)]: { sleep: 70, _t: 1 }, [shift(thisMon, -14)]: { sleep: 72, _t: 1 } }) });
+click(c.w, c.w.document.getElementById("chartsLink"));
+pick(sleepEl(), "year");
+ok(!!sleepEl().querySelector(".empty"), "one year of data is not a yearly trend");
+ok(/Not enough logged years/.test(sleepEl().querySelector(".empty").textContent),
+   "and it names the period: " + sleepEl().querySelector(".empty").textContent);
+ok(!!sleepEl().querySelector(".tc-period"), "the picker is still there to escape with");
+pick(sleepEl(), "week");
+ok(!sleepEl().querySelector(".empty") && dotsIn(sleepEl()) === 2, "switching back plots again");
+
 console.log("\n-- switching views never touches the log --");
 c = open({ "dailyReadout.v1": JSON.stringify(seed) });
 const before = c.jar["dailyReadout.v1"];

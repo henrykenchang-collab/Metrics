@@ -24,7 +24,8 @@ ok(ps.length===9,"nine panels: "+ps.map(p=>head(p).querySelector(".code").textCo
 ok(ps.every(p=>body(p)),"each grew a body wrapper");
 ok(ps.every(p=>p.id),"each has an id to remember by");
 ok(ps.every(p=>head(p).querySelector(".chev")),"each head has a chevron");
-ok(ps.every(p=>head(p).getAttribute("aria-expanded")==="true"),"all open to begin with");
+const openAtFirst=ps.filter(p=>p.id!=="vitaminSupply");
+ok(openAtFirst.every(p=>head(p).getAttribute("aria-expanded")==="true"),"all open to begin with, bar one");
 ok(ps.every(p=>head(p).getAttribute("role")==="button"),"heads announce as buttons");
 ok(head(ps[0]).getAttribute("aria-label")==="Journal","and carry their name: "+head(ps[0]).getAttribute("aria-label"));
 
@@ -43,10 +44,32 @@ ok(body(ps[2]).hidden===true,"Enter folds");
 head(ps[2]).dispatchEvent(new c.w.KeyboardEvent("keydown",{key:" ",bubbles:true}));
 ok(body(ps[2]).hidden===false,"Space unfolds");
 
+console.log("\n-- Vitamin Supply starts rolled up --");
+{
+  const fresh=open({});
+  const vit=panels(fresh.w).find(p=>p.id==="vitaminSupply");
+  ok(!!vit,"it has a stable id, not a positional one");
+  ok(body(vit).hidden===true,"and comes up shut on a log that has never been folded");
+  ok(panels(fresh.w).filter(p=>body(p).hidden).length===1,"it is the only one");
+  // the default is applied once; after that the choice is the user's
+  const vitHead=head(panels(fresh.w).find(p=>p.id==="vitaminSupply"));
+  click(fresh.w,vitHead);
+  ok(body(panels(fresh.w).find(p=>p.id==="vitaminSupply")).hidden===false,"opening it works");
+  const again=open(fresh.jar);
+  ok(body(panels(again.w).find(p=>p.id==="vitaminSupply")).hidden===false,
+     "and it stays open next load -- the default does not reassert itself");
+}
+{
+  // an existing log that predates the default still gets it, exactly once
+  const older=open({"dailyReadout.shut":JSON.stringify([])});
+  ok(body(panels(older.w).find(p=>p.id==="vitaminSupply")).hidden===true,
+     "a log with fold history but no marker still picks the default up");
+}
+
 console.log("\n-- it is remembered, per device --");
 click(c.w,head(ps[3])); click(c.w,head(ps[5]));
 const stored=JSON.parse(c.jar["dailyReadout.shut"]);
-ok(stored.length===2,"two panels remembered shut: "+stored.join(", "));
+ok(stored.length===3,"the two just folded, plus Vitamin Supply: "+stored.join(", "));
 ok(!c.jar["dailyReadout.v1"]||!/shut/.test(c.jar["dailyReadout.v1"]),"and never into the log");
 const c2=open(c.jar);
 const p2=panels(c2.w);
