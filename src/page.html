@@ -416,13 +416,6 @@
   .na-pill { color: var(--ink-3); }
   .na-pill.on { background: var(--ink-3); color: var(--surface); }
   .pill:active { transform: scale(.94); }
-  /* Verbal Fluency reads like Work Productivity's segmented scale — bordered
-     and monospace when off, solid copper when on — rather than the flat
-     Mood pill either side of it. */
-  .pill.flu { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700;
-    border: 1.5px solid var(--line-2); background: transparent; color: var(--ink-3); }
-  .pill.flu.on { background: var(--copper); border-color: var(--copper); color: var(--surface); }
-  .pill.flu.na-pill.on { background: var(--ink-3); border-color: var(--ink-3); }
 
   /* ---------------- markers ---------------- */
   .row {
@@ -905,7 +898,7 @@
   var FLU_OP = { bad: 0.34, avg: 0.62, good: 1 };
   var CHOICE_ROWS = [
     { key: "mood",    code: "MOOD", name: "Mood" },
-    { key: "fluency", code: "FLU",  name: "Verbal Fluency", na: true, flu: true }
+    { key: "fluency", code: "FLU",  name: "Verbal Fluency", na: true }
   ];
   function choiceLabel(v) {
     if (v === NA) return "N/A";
@@ -1448,7 +1441,7 @@
     var choices = c.na ? FLUENCY.concat([{ v: NA, label: "N/A" }]) : FLUENCY;
     choices.forEach(function (f) {
       var b = document.createElement("button");
-      b.className = "pill" + (c.flu ? " flu" : "") + (f.v === NA ? " na-pill" : "");
+      b.className = "pill" + (f.v === NA ? " na-pill" : "");
       b.type = "button"; b.textContent = f.label;
       b.setAttribute("aria-label", c.name + ": " + f.label);
       b.addEventListener("click", function () {

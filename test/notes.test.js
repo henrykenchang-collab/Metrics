@@ -28,6 +28,25 @@ ok(rows(c.w).every(r=>!r.querySelector(".row-sub")),"the second line is gone ent
 const mood=[...c.w.document.getElementById("choices").children].map(r=>r.querySelector(".rate-name").textContent);
 ok(mood.join("|")==="Mood|Verbal Fluency","mood and fluency untouched");
 
+console.log("\n-- Mood and Verbal Fluency are the same kind of control --");
+const choiceRow = n => [...c.w.document.getElementById("choices").children][n];
+const pillsOf = r => [...r.querySelectorAll(".pill")];
+const moodPills = pillsOf(choiceRow(0)), fluPills = pillsOf(choiceRow(1));
+ok(moodPills.length === 3, "Mood offers the three ratings: " + moodPills.map(b => b.textContent).join(","));
+ok(fluPills.length === 4, "Fluency offers those plus N/A: " + fluPills.map(b => b.textContent).join(","));
+// the rating pills must carry the same classes, so they inherit one style
+const cls = b => b.className.split(/\s+/).sort().join(" ");
+ok(moodPills.every(b => cls(b) === "pill"), "Mood's are plain pills: " + cls(moodPills[0]));
+ok(fluPills.slice(0, 3).every(b => cls(b) === "pill"),
+   "and Fluency's are the same, with no font or colour override of its own: " + cls(fluPills[0]));
+ok(cls(fluPills[3]) === "na-pill pill", "only its N/A stays neutral, as N/A is everywhere else");
+ok(!/\.pill\.flu/.test(HTML), "and the old segmented-scale styling is gone from the stylesheet");
+// selecting paints them the same way too
+fluPills[2].dispatchEvent(new c.w.MouseEvent("click", { bubbles: true }));
+moodPills[2].dispatchEvent(new c.w.MouseEvent("click", { bubbles: true }));
+ok(cls(fluPills[2]) === cls(moodPills[2]),
+   "picked, they still match: " + cls(fluPills[2]) + " vs " + cls(moodPills[2]));
+
 console.log("\n-- a note per rating --");
 ok(rows(c.w).every(r=>r.querySelector(".ratenote")),"every rating row has one");
 const n0=rows(c.w)[0].querySelector(".ratenote");
