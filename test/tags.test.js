@@ -29,6 +29,36 @@ let c = open({});
 ok(tags(c).indexOf("No XR/IR") >= 0, "No XR/IR is offered");
 ok(tags(c).indexOf("Nap") >= 0, "Nap is offered");
 
+console.log("\n-- LMNT is one of them --");
+ok(tags(c).indexOf("LMNT") >= 0, "offered on a page that has never synced a custom tag");
+click(c, "LMNT");
+ok((store(c).tags || []).indexOf("LMNT") >= 0, "it records on the day: " + JSON.stringify(store(c).tags));
+ok(!/LMNT/.test(c.jar["dailyReadout.tags"] || ""),
+   "and never enters the custom store -- it is built in, so it cannot be orphaned away");
+click(c, "LMNT");
+ok((store(c).tags || []).indexOf("LMNT") < 0, "tapping again clears it");
+// it is a factor Patterns can weigh, which is the point of adding it
+{
+  const seed = {};
+  const shift = (k, n) => { const p = k.split("-"); const d = new Date(+p[0], +p[1] - 1, +p[2]); d.setDate(d.getDate() + n); return iso(d); };
+  for (let i = 0; i < 20; i++) {
+    seed[shift(TODAY, -i)] = { ePre: i % 2 ? 4 : 2, vitamins: true, _t: 1,
+                               tags: i % 2 ? ["LMNT"] : [] };
+  }
+  const p2 = open({ "dailyReadout.v1": JSON.stringify(seed) });
+  const names = [...p2.w.document.querySelectorAll("#facts .fact-name")].map(e => e.textContent);
+  ok(names.some(n => n.indexOf("LMNT") >= 0), "it shows up in Patterns: " + names.slice(0, 6).join(" | "));
+}
+// a promoted duplicate is pruned, the same as any other built-in
+{
+  const dup = open({ "dailyReadout.tags": JSON.stringify(["LMNT", "Weak"]),
+                     "dailyReadout.v1": JSON.stringify({ "2026-08-01": { vitamins: true, tags: ["LMNT"], _t: 1 } }) });
+  ok(tags(dup).filter(t => t === "LMNT").length === 1, "typed by hand before today, it still appears once");
+  ok(JSON.parse(dup.jar["dailyReadout.tags"]).indexOf("LMNT") < 0, "the hand-added copy is dropped as redundant");
+  ok(JSON.parse(dup.jar["dailyReadout.v1"])["2026-08-01"].tags.join(",") === "LMNT",
+     "and the day that already carried it keeps it");
+}
+
 console.log("\n-- they are permanent, not custom --");
 ok(!c.jar["dailyReadout.tags"] || JSON.parse(c.jar["dailyReadout.tags"]).indexOf("Nap") < 0,
    "Nap is not written into the custom-tag store");
@@ -40,7 +70,7 @@ ok(tags(fresh).indexOf("Nap") >= 0 && tags(fresh).indexOf("No XR/IR") >= 0,
 
 console.log("\n-- the built-in set, in order --");
 const expected = ["Stress", "Poor Sleep", "Sick", "No Keto", "Late Caffeine (10AM)",
-                  "Late Gum (12PM)", "Extra Sleep", "Nap", "Extra XR/IR", "No XR/IR"];
+                  "Late Gum (12PM)", "Extra Sleep", "Nap", "Extra XR/IR", "No XR/IR", "LMNT"];
 ok(tags(c).join(" | ") === expected.join(" | "), "reads: " + tags(c).join(" | "));
 ok(tags(c).indexOf("No XR/IR") === tags(c).indexOf("Extra XR/IR") + 1,
    "No XR/IR sits beside the Extra it complements");
