@@ -41,6 +41,25 @@ setTimeout(()=>{
   const px=HTML.replace(/\s+/g," ").match(/\.corgi-mark \{[^}]*width: ([\d.]+)px/);
   ok(px&&parseFloat(px[1])<=16,"kept small: "+(px&&px[1])+"px");
 
+  console.log("\n-- Shanti, in colour, at the head of her own panel --");
+  const petHead=[...w.document.querySelectorAll("section.panel .panel-head")]
+    .find(h=>h.textContent.indexOf("Shanti and Buddha")===0);
+  ok(!!petHead,"the Shanti and Buddha head is found by its exact text");
+  ok(petHead.querySelector(".code").textContent==="Shanti and Buddha",
+     "the heading text is untouched by the drawing sitting in it: "+JSON.stringify(petHead.querySelector(".code").textContent));
+  const shanti=petHead.querySelector(".shanti-mark");
+  ok(!!shanti,"she is drawn there");
+  ok(shanti.tagName.toLowerCase()==="svg","inline, not a fetched image");
+  ok(shanti.getAttribute("aria-hidden")==="true","hidden from a screen reader; the heading already names her");
+  ok(petHead.querySelector(".code").firstElementChild===shanti,"she sits before the words");
+  ok(shanti.querySelectorAll("[fill]").length>10,"a full-colour drawing, not a one-tone mark: "+shanti.querySelectorAll("[fill]").length+" filled parts");
+  // the ids she carries must not collide with anything else on the page
+  ["shHead","shBody","shEarL","shEarR","shSable"].forEach(id=>
+    ok(w.document.querySelectorAll("#"+id).length===1,id+" is unique in the document"));
+  ok(!w.document.querySelector(".shell .shanti-mark:not(.panel-head .shanti-mark)")
+     || [...w.document.querySelectorAll(".shanti-mark")].length===1,
+     "she appears once, in her own panel, and nowhere else");
+
   console.log("\n-- the tracker still works --");
   ok(w.document.querySelectorAll("#rows > *, #petrows > *").length===13,"13 markers still render");
   const sub=c=>[...w.document.getElementById("rows").children]
