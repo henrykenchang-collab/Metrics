@@ -48,11 +48,21 @@ type(c.w, hrvIn, 39); ok(band(hrvIn) === "band-warn", "39 is warn");
 type(c.w, hrvIn, 35); ok(band(hrvIn) === "band-warn", "35 is warn");
 type(c.w, hrvIn, 34); ok(band(hrvIn) === "band-bad", "34 is bad");
 
-console.log("\n-- only these three carry a band --");
+console.log("\n-- CPAP: red below 80, and nothing above it --");
 c = open({});
-ok(band(cell(c.w, "CPAP").querySelector("input")) === null, "CPAP has no band before typing");
-type(c.w, cell(c.w, "CPAP").querySelector("input"), 90);
-ok(band(cell(c.w, "CPAP").querySelector("input")) === null, "nor after -- it has no stated range");
+const cpapIn = cell(c.w, "CPAP").querySelector("input");
+ok(band(cpapIn) === null, "no band before typing");
+type(c.w, cpapIn, 79); ok(band(cpapIn) === "band-bad", "79 is bad");
+type(c.w, cpapIn, 0);  ok(band(cpapIn) === "band-bad", "0 is bad");
+type(c.w, cpapIn, 80); ok(band(cpapIn) === null, "80 is not red -- and not green either, no good end was ever stated");
+type(c.w, cpapIn, 100); ok(band(cpapIn) === null, "nor is 100");
+type(c.w, cpapIn, 75); ok(band(cpapIn) === "band-bad", "back under and it colours again");
+type(c.w, cpapIn, "");
+ok(band(cpapIn) === null, "clearing it clears the colour");
+ok(!cpapIn.className.match(/band-(null|undefined)/), "an uncoloured band never leaves a junk class: " + cpapIn.className);
+
+console.log("\n-- the rest of the row still carries no band --");
+c = open({});
 const avgHrIn = [...c.w.document.querySelectorAll("#stats2 .stat")]
   .find(e => e.querySelector(".stat-label").textContent === "Avg HR").querySelector("input");
 type(c.w, avgHrIn, 50);

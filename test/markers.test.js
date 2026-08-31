@@ -76,7 +76,11 @@ ok(store(c).shantiBrush===true,"Shanti Brush records");
 const gl=[...c.w.document.getElementById("grid").querySelectorAll(".grid-label")].map(e=>e.textContent);
 ok(gl.includes("WLK"),"Walk still has a month-grid row");
 ok(!gl.includes("BUD")&&!gl.includes("SHA"),"but the once-a-week brushes are left off the table: "+gl.join(","));
-ok(rowFor(c.w,"BUD").querySelector(".streak").textContent.endsWith("d"),"and carry a streak like any other");
+// on a Sunday, the one day they are due -- any other day they correctly read
+// "Not Due" instead of a streak, so pin the open day rather than flake on it
+const bud=open({},{"dailyReadout.cur":JSON.stringify({d:(()=>{const d=new Date();while(d.getDay()!==0)d.setDate(d.getDate()-1);return iso(d);})(),on:TODAY})});
+ok(rowFor(bud.w,"BUD").querySelector(".streak").textContent.endsWith("d"),
+   "and carry a streak like any other on the day they are due: "+rowFor(bud.w,"BUD").querySelector(".streak").textContent);
 
 console.log("\n-- the brushes are weekly, starting today --");
 const lastSun=(()=>{const d=new Date();while(d.getDay()!==0)d.setDate(d.getDate()-1);return iso(d);})();

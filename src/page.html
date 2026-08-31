@@ -198,7 +198,11 @@
   .readout-label { color: var(--ink-3); }
   /* the same understated link treatment as "Back to Today" — a way out of
      the current view, not an action taken on it */
-  .viewlink { flex: none; color: var(--ink-3); border-bottom: 1px dashed var(--line-2); }
+  .viewlink { flex: none; color: var(--ink-3); border-bottom: 1px dashed var(--line-2); display: inline-flex; align-items: center; gap: 5px; }
+  /* the corgi from the ground behind the page, cropped to his head: the whole
+     dog at this size is a blob, but the two ears still read at 14px. Inked
+     from the link's own colour, so he follows it into either theme. */
+  .corgi-mark { width: 14px; height: 14px; flex: none; fill: currentColor; opacity: .85; }
   .bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
   .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width .3s cubic-bezier(.2,.7,.3,1); }
   .readout-note { color: var(--ink-2); font-size: 12.5px; }
@@ -622,7 +626,7 @@
       <div class="readout-meta">
         <div class="readout-label-row">
           <span class="code readout-label">Markers Due Today</span>
-          <button class="code viewlink" id="chartsLink" type="button">Trend Charts →</button>
+          <button class="code viewlink" id="chartsLink" type="button"><svg class="corgi-mark" viewBox="19 1 62 65" aria-hidden="true"><path d="M29 31 21 6c-.6-2.6 2-4 4.1-2.4L45.5 20Z"/><path d="M71 31 79 6c.6-2.6-2-4-4.1-2.4L54.5 20Z"/><circle cx="50" cy="41" r="23"/></svg>Trend Charts →</button>
         </div>
         <div class="bar"><i id="scoreBar" style="width:0%"></i></div>
         <span class="readout-note" id="note">Nothing logged yet.</span>
@@ -818,7 +822,10 @@
       band: function (v) { return v <= 60 ? "good" : v <= 64 ? "warn" : "bad"; } },
     { key: "hrv",   label: "Heart Rate Variability", short: "HRV",     min: 0,  max: 100, unit: "ms",
       band: function (v) { return v >= 40 ? "good" : v >= 35 ? "warn" : "bad"; } },
-    { key: "cpap",  label: "CPAP Score",             short: "CPAP",    min: 0,  max: 100, unit: "/100" }
+    { key: "cpap",  label: "CPAP Score",             short: "CPAP",    min: 0,  max: 100, unit: "/100",
+      /* only the bad end is stated, so only the bad end is coloured: no
+         green claim for a "good" CPAP score that was never defined */
+      band: function (v) { return v < 80 ? "bad" : null; } }
   ];
 
   /* From the Oura export, not the API pull: the ring reports both an average
@@ -1344,7 +1351,9 @@
   function paintBand(s, input, v) {
     input.classList.remove("band-good", "band-warn", "band-bad");
     if (!s.band || v === null || v === undefined) return;
-    input.classList.add("band-" + s.band(v));
+    // a band function may leave part of its range uncoloured
+    var b = s.band(v);
+    if (b) input.classList.add("band-" + b);
   }
 
   ["bed", "wake"].forEach(function (k) {

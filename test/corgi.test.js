@@ -28,6 +28,20 @@ const w=new JSDOM("<!doctype html><html><head><meta charset='utf-8'></head><body
    Object.defineProperty(w,"localStorage",{value:{getItem:k=>(k in jar?jar[k]:null),
     setItem:(k,v)=>{jar[k]=String(v);},removeItem:k=>{delete jar[k];}},configurable:true});}}).window;
 setTimeout(()=>{
+  console.log("\n-- and a small one on the Trend Charts link --");
+  const link=w.document.getElementById("chartsLink");
+  const mark=link.querySelector(".corgi-mark");
+  ok(!!mark,"the link carries a corgi mark");
+  ok(mark.tagName.toLowerCase()==="svg","drawn inline, not fetched");
+  ok(link.firstElementChild===mark,"and it sits before the words, not after");
+  ok(link.textContent.indexOf("Trend Charts")===0,"the label itself is untouched: "+JSON.stringify(link.textContent));
+  ok(mark.getAttribute("aria-hidden")==="true","hidden from a screen reader -- the link already says where it goes");
+  ok(/fill: currentColor/.test(HTML.replace(/\s+/g," ").match(/\.corgi-mark \{[^}]*\}/)[0]),
+     "inked from the link's own colour, so it follows the theme");
+  const px=HTML.replace(/\s+/g," ").match(/\.corgi-mark \{[^}]*width: ([\d.]+)px/);
+  ok(px&&parseFloat(px[1])<=16,"kept small: "+(px&&px[1])+"px");
+
+  console.log("\n-- the tracker still works --");
   ok(w.document.querySelectorAll("#rows > *, #petrows > *").length===13,"13 markers still render");
   const sub=c=>[...w.document.getElementById("rows").children]
     .find(b=>b.querySelector(".row-code").textContent===c).querySelector(".row-sub").textContent.trim().replace(/^:\s*/,"");

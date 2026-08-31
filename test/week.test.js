@@ -47,8 +47,12 @@ w=open({"dailyReadout.v1":JSON.stringify({[shift(mon,-1)]:{extraIr:40,_t:1},[mon
 ok(/\+20 mg/.test(week(w)),"last week's Sunday is not in this week's balance: "+week(w));
 
 console.log("\n-- taking early and giving it back --");
-w=open({"dailyReadout.v1":JSON.stringify({[mon]:{extraIr:20,_t:1},[shift(mon,1)]:{extraIr:-20,_t:1}})});
-ok(/\+?0 mg/.test(week(w)),"two on Monday and none on Tuesday nets to zero: "+week(w));
+// pinned to this week's Thursday: the giving-back Tuesday has to have
+// happened already, or on a real Monday it is still in the future and the
+// balance never sees it
+const thu=shift(mon,3);
+w=open({"dailyReadout.v1":JSON.stringify({[mon]:{extraIr:20,_t:1},[shift(mon,1)]:{extraIr:-20,_t:1}})},thu,thu);
+ok(/(^|[^\d-])0 mg/.test(week(w)),"two on Monday and none on Tuesday nets to zero: "+week(w));
 ok(!/to offset/.test(week(w)),"nothing left to offset when the week is level");
 ok(!flagged(w),"and nothing is flagged");
 
