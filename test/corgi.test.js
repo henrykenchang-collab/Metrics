@@ -61,7 +61,7 @@ setTimeout(()=>{
      "she appears once, in her own panel, and nowhere else");
 
   console.log("\n-- the tracker still works --");
-  ok(w.document.querySelectorAll("#rows > *, #petrows > *").length===13,"13 markers still render");
+  ok(w.document.querySelectorAll("#rows > *, #petrows > *").length===14,"14 markers still render");
   const sub=c=>[...w.document.getElementById("rows").children]
     .find(b=>b.querySelector(".row-code").textContent===c).querySelector(".row-sub").textContent.trim().replace(/^:\s*/,"");
   ok(sub("GRN")==="Sun · Mon · Wed","greens schedule intact");

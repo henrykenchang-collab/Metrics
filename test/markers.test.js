@@ -38,7 +38,7 @@ console.log("\n-- Gym --");
 let c=open({});
 ok(!!rowFor(c.w,"GYM"),"a GYM row exists");
 ok(title(c.w,"GYM")==="Gym: Sun · Mon · Thu · Fri","reads: "+JSON.stringify(title(c.w,"GYM")));
-ok(c.w.document.querySelectorAll("#rows > *, #petrows > *").length===13,"thirteen markers now, across two panels");
+ok(c.w.document.querySelectorAll("#rows > *, #petrows > *").length===14,"fourteen markers now, across two panels");
 ok(c.w.document.getElementById("petrows").children.length===3,"three of them in Shanti and Buddha");
 rowFor(c.w,"GYM").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
 ok(store(c).gym===true,"it records");

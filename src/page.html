@@ -787,6 +787,12 @@
     { key: "plunge",   code: "CLD", name: "Cold Plunge", days: [0, 1, 2, 3, 4, 5] },
     { key: "run",      code: "RUN", name: "Run",         days: [0, 1, 2, 3, 4] },
     { key: "gym",      code: "GYM", name: "Gym",         days: [0, 1, 4, 5] },
+    /* Due because it is a working day, so the federal holidays come out of
+       it as well as the weekend. `since` keeps the months before it existed
+       from reading as a lapse, the same as Sauna and the brushes. */
+    { key: "walkWork", code: "WWK", name: "Walk (Work)", sub: "15 Min",
+      days: [1, 2, 3, 4, 5], noHoliday: true, since: "2026-08-31",
+      label: "Walk 15min (Work)" },
     // subDays overrides the target on given weekdays (0 = Sunday)
     { key: "read",     code: "RDG", name: "Read", sub: "15 Min",
       days: [0, 1, 2, 3, 4, 5],
@@ -1101,11 +1107,26 @@
   function hm(m) { return Math.floor(m / 60) + "h " + String(m % 60).padStart(2, "0") + "m"; }
 
   /* ---- schedules ---- */
-  function isDue(m, k) { return (!m.since || k >= m.since) && (!m.days || m.days.indexOf(dow(k)) >= 0); }
+  /* `noHoliday` drops the federal holidays out of a weekday schedule, for the
+     things that are only due because it is a working day. Everything that
+     asks whether a marker is due -- the streaks, the readout's denominator,
+     the month grid and the export -- comes through here, so the holiday is
+     never a miss anywhere. */
+  function isDue(m, k) {
+    if (m.since && k < m.since) return false;
+    if (m.days && m.days.indexOf(dow(k)) < 0) return false;
+    if (m.noHoliday && holidayName(k)) return false;
+    return true;
+  }
 
+  var WORKWEEK = "1,2,3,4,5";
   function scheduleText(m) {
-    if (!m.days || m.days.length === 7) return "";
-    var set = m.days.slice().sort(function (a, b) { return a - b; });
+    var sorted = m.days ? m.days.slice().sort(function (a, b) { return a - b; }) : null;
+    /* Monday to Friday minus the holidays is exactly what "workdays" means,
+       and says it in one word rather than three */
+    if (m.noHoliday && sorted && sorted.join(",") === WORKWEEK) return "Workdays";
+    if (!m.days || m.days.length === 7) return m.noHoliday ? "Not Holidays" : "";
+    var set = sorted;
     if (set.length === 6) {
       for (var i = 0; i < 7; i++) if (set.indexOf(i) < 0) return "Not " + DAY_ABBR[i];
     }
