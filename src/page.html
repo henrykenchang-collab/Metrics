@@ -2426,13 +2426,14 @@
      whichever measure has the narrower range. All four still share the
      same date range, so they stay comparable at a glance.
 
-     Plotted weekly, Monday through Sunday, not per night: a season of
-     nightly noise is a wall of teeth with no pattern in it, and the
-     Monday-Sunday week is the same boundary the IR/XR guardrail already
-     uses, rather than a second definition of "week" for this app to hold.
-     Each point is the mean of whatever nights that week actually have a
-     reading — a week with one night logged still gets a point, just an
-     unaveraged one.
+     The picker sets the window you are looking at, not a re-cut of the
+     whole log: "Month" means the last 30 days, not every day you ever
+     logged bucketed into months. How finely those days are plotted then
+     follows from the window, so that every choice lands on a readable
+     number of points instead of 7 lonely dots or a year of nightly
+     teeth: a week and a month are plotted per day, a quarter per week,
+     a year per month. A bucket with one reading in it still gets a
+     point, just an unaveraged one.
      ============================================================ */
   var TREND_CHARTS = [
     { key: "sleep", label: "Sleep Score" },
@@ -2441,31 +2442,47 @@
     { key: "cpap",  label: "CPAP Score" }
   ];
 
-  /* Each period buckets a day onto the date its period STARTS, so the
-     bucket key is itself a date and the x axis needs no special case:
-     a week is its Monday, a month its 1st, a quarter its first month's
-     1st, a year its January 1st. */
-  function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+  /* Day-level ticks for the short windows, month-level for the long ones.
+     Both hand back every candidate they can; the spacing filter downstream
+     drops whatever will not fit, so a 30-day window thins itself. */
+  function dayTicks(pts) {
+    var lastMonth = null, out = [];
+    pts.forEach(function (p) {
+      var d = fromISO(p.k), m = d.getFullYear() * 12 + d.getMonth();
+      out.push({ k: p.k, label: m === lastMonth ? String(d.getDate()) : monthOnly(p.k) + " " + d.getDate() });
+      lastMonth = m;
+    });
+    return out;
+  }
+  function monthTicks(pts) {
+    var lastYm = null, lastYear = null, out = [];
+    pts.forEach(function (p) {
+      var d = fromISO(p.k), ym = d.getFullYear() * 12 + d.getMonth(), yr = d.getFullYear();
+      if (ym !== lastYm) {
+        out.push({ k: p.k, label: (lastYear === null || yr !== lastYear) ? monthYear(p.k) : monthOnly(p.k) });
+        lastYm = ym; lastYear = yr;
+      }
+    });
+    return out;
+  }
+
   var TREND_PERIODS = [
-    { id: "week", label: "Weekly", agg: "Weekly average", noun: "weeks",
-      at: function (k) { return weekStart(k); },
-      tip: function (k) { return "Week of " + shortDate(k); },
-      range: function (k) { return shortDate(k); } },
-    { id: "month", label: "Monthly", agg: "Monthly average", noun: "months",
-      at: function (k) { return k.slice(0, 8) + "01"; },
+    { id: "week", label: "Week", days: 7, window: "the last 7 days", sub: "Last 7 days",
+      at: function (k) { return k; }, ticks: dayTicks,
+      tip: function (k) { return shortDate(k); }, range: function (k) { return shortDate(k); } },
+    { id: "month", label: "Month", days: 30, window: "the last 30 days", sub: "Last 30 days",
+      at: function (k) { return k; }, ticks: dayTicks,
+      tip: function (k) { return shortDate(k); }, range: function (k) { return shortDate(k); } },
+    { id: "quarter", label: "Quarter", days: 91, window: "the last 13 weeks", sub: "Last 13 weeks · weekly average",
+      at: function (k) { return weekStart(k); }, ticks: monthTicks,
+      tip: function (k) { return "Week of " + shortDate(k); }, range: function (k) { return shortDate(k); } },
+    { id: "year", label: "Year", days: 365, window: "the last 12 months", sub: "Last 12 months · monthly average",
+      at: function (k) { return k.slice(0, 8) + "01"; }, ticks: monthTicks,
       tip: function (k) { return fromISO(k).toLocaleDateString(undefined, { month: "long", year: "numeric" }); },
-      range: function (k) { return monthYear(k); } },
-    { id: "quarter", label: "Quarterly", agg: "Quarterly average", noun: "quarters",
-      at: function (k) { return k.slice(0, 5) + pad2(Math.floor((+k.slice(5, 7) - 1) / 3) * 3 + 1) + "-01"; },
-      tip: function (k) { return "Q" + (Math.floor((+k.slice(5, 7) - 1) / 3) + 1) + " " + k.slice(0, 4); },
-      range: function (k) { return "Q" + (Math.floor((+k.slice(5, 7) - 1) / 3) + 1) + " " + k.slice(2, 4); } },
-    { id: "year", label: "Yearly", agg: "Yearly average", noun: "years",
-      at: function (k) { return k.slice(0, 4) + "-01-01"; },
-      tip: function (k) { return k.slice(0, 4); },
-      range: function (k) { return k.slice(0, 4); } }
+      range: function (k) { return monthYear(k); } }
   ];
 
-  /* Which period each chart is showing is a preference, like a folded
+  /* Which window each chart is showing is a preference, like a folded
      panel: remembered, but never part of the log. */
   var PERIODSTORE = "dailyReadout.trendPeriod";
   var trendPeriod = {};
@@ -2474,12 +2491,14 @@
     for (var i = 0; i < TREND_PERIODS.length; i++) {
       if (TREND_PERIODS[i].id === trendPeriod[key]) return TREND_PERIODS[i];
     }
-    return TREND_PERIODS[0];
+    return TREND_PERIODS[1];          // a month by default
   }
 
   function periodPoints(key, period) {
+    var today = todayISO(), from = shift(today, -(period.days - 1));
     var buckets = {};
     Object.keys(data).forEach(function (k) {
+      if (k < from || k > today) return;             // the window, not the whole log
       var v = data[k][key];
       if (typeof v !== "number") return;
       var b = period.at(k);
@@ -2521,8 +2540,8 @@
        little history is exactly when you need to switch back out of it. */
     if (pts.length < 2) {
       wrap.innerHTML = '<div class="tc-head"><span class="tc-name">' + esc(spec.label) + '</span></div>' +
-        '<div class="tc-sub"><span class="tc-agg">' + period.agg + '</span>' + picker + '</div>' +
-        '<p class="empty">Not enough logged ' + period.noun + ' yet for a trend.</p>';
+        '<div class="tc-sub"><span class="tc-agg">' + period.sub + '</span>' + picker + '</div>' +
+        '<p class="empty">' + (pts.length ? "Only one reading in " : "Nothing logged in ") + period.window + '.</p>';
       wireTrendPeriod(wrap, spec);
       return wrap;
     }
@@ -2555,33 +2574,24 @@
     var trendLine = '<line class="tc-trend" x1="' + xAt(first).toFixed(1) + '" y1="' + yAt(fit.first).toFixed(1) +
       '" x2="' + xAt(last).toFixed(1) + '" y2="' + yAt(fit.last).toFixed(1) + '"></line>';
 
-    // one tick wherever the plotted weeks cross into a new calendar month, so
-    // scanning across the line tells you when, not just the overall span
-    // already named up in .tc-range -- the year rides along only on the
-    // first tick and wherever it actually changes, or ~10 months of these
-    // packed into one small chart overlap into an unreadable smear
-    var lastYm = null, lastYear = null, monthTicks = [];
-    pts.forEach(function (p) {
-      var dt = fromISO(p.k), ym = dt.getFullYear() * 12 + dt.getMonth(), yr = dt.getFullYear();
-      if (ym !== lastYm) {
-        var x = xAt(p.k), label = (lastYear === null || yr !== lastYear) ? monthYear(p.k) : monthOnly(p.k);
-        monthTicks.push({ x: x, label: label, anchor: x < 20 ? "start" : (x > W - 20 ? "end" : "middle") });
-        lastYm = ym; lastYear = yr;
-      }
+    /* The window decides how the axis reads: days for a week or a month,
+       months for a quarter or a year. Either way the candidates come back
+       in full and the spacing filter below drops what will not fit, so a
+       dense window thins itself rather than smearing. */
+    var axisTicks = period.ticks(pts).map(function (t) {
+      var x = xAt(t.k);
+      return { x: x, label: t.label, anchor: x < 20 ? "start" : (x > W - 20 ? "end" : "middle") };
     });
-    // a sparsely-logged month can butt its tick right up against the next
-    // one; drop any tick whose label would actually run into the last one
-    // kept, rather than let the two overlap into an unreadable smear. Widths
-    // are estimated (monospace, so a flat per-character figure holds).
+    // Widths are estimated (monospace, so a flat per-character figure holds).
     var CHAR_W = 5.1, rightEdge = -Infinity;
-    monthTicks = monthTicks.filter(function (t) {
+    axisTicks = axisTicks.filter(function (t) {
       var w = t.label.length * CHAR_W;
       var left = t.anchor === "start" ? t.x : (t.anchor === "end" ? t.x - w : t.x - w / 2);
       if (left < rightEdge + 3) return false;
       rightEdge = left + w;
       return true;
     });
-    var ticks = monthTicks.map(function (t) {
+    var ticks = axisTicks.map(function (t) {
       return '<line class="tc-tickline" x1="' + t.x.toFixed(1) + '" y1="' + (H - PAD_B) + '" x2="' + t.x.toFixed(1) + '" y2="' + (H - PAD_B + 3) + '"></line>' +
         '<text class="tc-tick" style="text-anchor:' + t.anchor + '" x="' + t.x.toFixed(1) + '" y="' + (H - 2) + '">' + t.label + '</text>';
     }).join("");
@@ -2589,7 +2599,7 @@
     wrap.innerHTML =
       '<div class="tc-head"><span class="tc-name">' + esc(spec.label) + '</span>' +
         '<span class="tc-range">' + period.range(first) + ' – ' + period.range(last) + '</span></div>' +
-      '<div class="tc-sub"><span class="tc-agg">' + period.agg + '</span>' + picker + '</div>' +
+      '<div class="tc-sub"><span class="tc-agg">' + period.sub + '</span>' + picker + '</div>' +
       '<div class="tc-wrap">' +
         '<svg class="tc-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
           '<line class="tc-axis" x1="0" y1="' + (H - PAD_B) + '" x2="' + W + '" y2="' + (H - PAD_B) + '"></line>' +
