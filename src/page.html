@@ -412,9 +412,6 @@
   .pills { display: flex; gap: 4px; padding: 3px; background: var(--surface-2); border-radius: 11px; flex: none; }
   .pill { padding: 6px 11px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); transition: background .15s ease, color .15s ease, transform .15s ease; }
   .pill.on { background: var(--copper); color: var(--surface); }
-  /* neutral, like the N/A among the rating steps: an opt-out, not a verdict */
-  .na-pill { color: var(--ink-3); }
-  .na-pill.on { background: var(--ink-3); color: var(--surface); }
   .pill:active { transform: scale(.94); }
 
   /* ---------------- markers ---------------- */
@@ -888,6 +885,15 @@
   /* "Energy" over "Pre-Work AM" was two lines saying one thing. One line, and
      the space goes to a note instead — a score on its own rarely says why. */
   function ratingLabel(r) { return r.name + (r.sub ? ": " + r.sub : ""); }
+  /* On a day off there is no work to sit either side of: the same four
+     moments still happen, they just happen at home. Display only -- the
+     export, the Patterns picker and the guardrails all keep the canonical
+     name, or one metric's history would split across two headings. Holidays
+     count with the weekend, the same way Work Productivity already treats
+     them. */
+  function ratingLabelFor(r, k) {
+    return r.sub && isOffDay(k) ? r.name + ": " + r.sub.replace(/Work/g, "Home") : ratingLabel(r);
+  }
   function noteKey(r) { return r.key + "Note"; }
   function ratingNum(v) { return typeof v === "number" ? v : null; }
 
@@ -1378,10 +1384,12 @@
   });
 
   var segNodes = {}, naNodes = {}, noteNodes = {};
+  var nameNodes = {};
   RATINGS.forEach(function (r) {
     var row = document.createElement("div");
     row.className = "rate-row scale";
     row.innerHTML = '<span class="rate-name">' + esc(ratingLabel(r)) + '</span>';
+    nameNodes[r.key] = row.querySelector(".rate-name");
     var meter = document.createElement("div");
     meter.className = "meter";
     var segs = [];
@@ -1441,7 +1449,7 @@
     var choices = c.na ? FLUENCY.concat([{ v: NA, label: "N/A" }]) : FLUENCY;
     choices.forEach(function (f) {
       var b = document.createElement("button");
-      b.className = "pill" + (f.v === NA ? " na-pill" : "");
+      b.className = "pill";
       b.type = "button"; b.textContent = f.label;
       b.setAttribute("aria-label", c.name + ": " + f.label);
       b.addEventListener("click", function () {
@@ -2132,6 +2140,14 @@
     $("spanLabel").textContent = assumed ? "Assumed" : "In Bed";
 
     RATINGS.forEach(function (r) {
+      var shown = ratingLabelFor(r, cur);
+      nameNodes[r.key].textContent = shown;
+      segNodes[r.key].forEach(function (sg, i) {
+        sg.setAttribute("aria-label", shown + ": " + SCALE[i] + " out of 5");
+      });
+      naNodes[r.key].setAttribute("aria-label", shown + ": not applicable");
+      noteNodes[r.key].setAttribute("aria-label", shown + ": note");
+
       /* fill by position, not by value — the steps are not evenly spaced */
       var val = d[r.key];
       if (val === undefined && r.key === "work" && isOffDay(cur)) val = NA;

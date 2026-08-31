@@ -27,7 +27,10 @@ console.log("\n-- the N/A category --");
 let c=open({});
 ok(fluPills(c.w).map(p=>p.textContent).join(",")==="Bad,Average,Good,N/A","fluency gains N/A");
 ok(moodPills(c.w).map(p=>p.textContent).join(",")==="Bad,Average,Good","mood does not");
-ok(fluPills(c.w)[3].classList.contains("na-pill"),"styled apart from the verdicts");
+// it reads as one of the choices now, not an aside: same pill, same copper
+ok(!fluPills(c.w)[3].classList.contains("na-pill"),"no styling of its own");
+ok(fluPills(c.w).every(p=>p.className==="pill"),
+   "all four are the same pill: "+fluPills(c.w).map(p=>p.className).join(" | "));
 
 console.log("\n-- 2026 federal holidays, computed --");
 // each of the eleven, on a weekday so the weekend rule is not doing the work
@@ -49,6 +52,29 @@ ok(/Independence Day/.test(dow(x.w)),"the Friday before is: "+dow(x.w));
 // 1 Jan 2028 is a Saturday -> observed 31 Dec 2027, in the previous year
 x=open({},"2027-12-31","2027-12-31");
 ok(/New Year/.test(dow(x.w)),"a New Year observed in December is still found: "+dow(x.w));
+
+console.log("\n-- the Energy rows say Home on a day off --");
+const rateNames = w => [...w.document.getElementById("rates").children]
+  .map(r => r.querySelector(".rate-name").textContent);
+// a plain Wednesday
+let wk = open({}, "2026-08-26", "2026-08-26");
+ok(rateNames(wk.w).join(" | ") ===
+   "Energy: Pre-Work AM | Energy: Work AM | Energy: Work PM | Energy: Post Work | Work Productivity",
+   "a working day is unchanged: " + rateNames(wk.w).join(" | "));
+// the Saturday after
+let we = open({}, "2026-08-29", "2026-08-29");
+ok(rateNames(we.w).join(" | ") ===
+   "Energy: Pre-Home AM | Energy: Home AM | Energy: Home PM | Energy: Post Home | Work Productivity",
+   "a weekend swaps Work for Home: " + rateNames(we.w).join(" | "));
+ok(rateNames(we.w)[4] === "Work Productivity",
+   "Work Productivity keeps its name -- it is the thing there is none of, not a place");
+// a holiday counts as a day off too, the same way Work Productivity treats it
+let hol = open({}, "2026-11-26", "2026-11-26");
+ok(rateNames(hol.w)[1] === "Energy: Home AM", "Thanksgiving reads Home too: " + rateNames(hol.w)[1]);
+// the screen reader hears what the eye sees
+const seg0 = we.w.document.getElementById("rates").children[1].querySelector(".seg");
+ok(seg0.getAttribute("aria-label") === "Energy: Home AM: 1 out of 5",
+   "and so does the label read out: " + seg0.getAttribute("aria-label"));
 
 console.log("\n-- fluency defaults on a day off --");
 x=open({},"2026-11-26","2026-11-26");            // Thanksgiving, a Thursday
@@ -115,6 +141,13 @@ x.w.document.getElementById("copyBtn").dispatchEvent(new x.w.MouseEvent("click",
 setTimeout(()=>{
   const line=copied.split("\n").find(l=>l.indexOf("2026-11-26")===0)||"";
   ok(/N\/A/.test(line),"N/A exports as N/A: "+line.slice(-40));
+
+  // the Home wording is a screen label only: a column heading that followed
+  // the day you happened to be viewing would split one metric across two
+  console.log("\n-- the export keeps one heading per metric --");
+  const head=copied.split("\n")[0];
+  ok(/Energy: Work AM/.test(head),"the canonical name is what ships: "+head.slice(0,120));
+  ok(!/Home/.test(head),"and Home never reaches it, even exported from a day off");
   console.log(fail?"\n"+fail+" FAILED":"\nall passed");
   process.exit(fail?1:0);
 },150);

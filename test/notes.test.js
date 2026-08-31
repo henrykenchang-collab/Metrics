@@ -37,9 +37,9 @@ ok(fluPills.length === 4, "Fluency offers those plus N/A: " + fluPills.map(b => 
 // the rating pills must carry the same classes, so they inherit one style
 const cls = b => b.className.split(/\s+/).sort().join(" ");
 ok(moodPills.every(b => cls(b) === "pill"), "Mood's are plain pills: " + cls(moodPills[0]));
-ok(fluPills.slice(0, 3).every(b => cls(b) === "pill"),
+ok(fluPills.every(b => cls(b) === "pill"),
    "and Fluency's are the same, with no font or colour override of its own: " + cls(fluPills[0]));
-ok(cls(fluPills[3]) === "na-pill pill", "only its N/A stays neutral, as N/A is everywhere else");
+ok(cls(fluPills[3]) === "pill", "its N/A included -- it is one of the choices, not an aside");
 ok(!/\.pill\.flu/.test(HTML), "and the old segmented-scale styling is gone from the stylesheet");
 // selecting paints them the same way too
 fluPills[2].dispatchEvent(new c.w.MouseEvent("click", { bubbles: true }));
