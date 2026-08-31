@@ -903,8 +903,9 @@
   var FLU_N = { bad: 1, avg: 2, good: 3 };
   var FLU_OP = { bad: 0.34, avg: 0.62, good: 1 };
   var CHOICE_ROWS = [
-    { key: "mood",    code: "MOOD", name: "Mood" },
-    { key: "fluency", code: "FLU",  name: "Verbal Fluency", na: true }
+    { key: "mood",       code: "MOOD", name: "Mood" },
+    { key: "motivation", code: "MOT",  name: "Motivation" },
+    { key: "fluency",    code: "FLU",  name: "Verbal Fluency", na: true }
   ];
   function choiceLabel(v) {
     if (v === NA) return "N/A";
@@ -940,6 +941,7 @@
   var OUTCOMES = [
     { v: "energy",      label: "Energy",     dp: 1, unit: "pts" },
     { v: "mood",        label: "Mood",       dp: 1, unit: "pts" },
+    { v: "motivation",  label: "Motivation", dp: 1, unit: "pts" },
     { v: "work",        label: "Work",       dp: 1, unit: "pts" },
     { v: "sleep",       label: "Sleep",      dp: 0, unit: "pts" },
     { v: "avgHr",       label: "Avg HR",     dp: 0, unit: "bpm" },
@@ -958,6 +960,8 @@
       get: function (d) { return ratingNum(d.work); } },
     { label: "Mood",                   dp: 1, unit: "",     move: 0.4, good: "up",
       get: function (d) { return fluNum(d.mood); } },
+    { label: "Motivation",             dp: 1, unit: "",     move: 0.4, good: "up",
+      get: function (d) { return fluNum(d.motivation); } },
     { label: "Verbal Fluency",         dp: 1, unit: "",     move: 0.4, good: "up",
       get: function (d) { return fluNum(d.fluency); } },
     { label: "Sleep Score",            dp: 0, unit: "",     move: 5,   good: "up",
@@ -1750,6 +1754,7 @@
     if (!d) return null;
     if (which === "energy") return avgEnergy(d);
     if (which === "mood") return fluNum(d.mood);
+    if (which === "motivation") return fluNum(d.motivation);
     if (which === "work") return ratingNum(d.work);
     if (which === "avgHr" || which === "deepSleep" || which === "remSleep" || which === "lightSleep") {
       return d[which] === undefined ? null : d[which];

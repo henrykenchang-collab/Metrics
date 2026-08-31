@@ -26,12 +26,17 @@ ok(names.join(" | ")==="Energy: Pre-Work AM | Energy: Work AM | Energy: Work PM 
    "all five read as one line each");
 ok(rows(c.w).every(r=>!r.querySelector(".row-sub")),"the second line is gone entirely");
 const mood=[...c.w.document.getElementById("choices").children].map(r=>r.querySelector(".rate-name").textContent);
-ok(mood.join("|")==="Mood|Verbal Fluency","mood and fluency untouched");
+ok(mood.join("|")==="Mood|Motivation|Verbal Fluency","the three choice rows, Motivation under Mood: "+mood.join("|"));
 
 console.log("\n-- Mood and Verbal Fluency are the same kind of control --");
-const choiceRow = n => [...c.w.document.getElementById("choices").children][n];
+const choiceRow = name => [...c.w.document.getElementById("choices").children]
+  .find(r => r.querySelector(".rate-name").textContent === name);
 const pillsOf = r => [...r.querySelectorAll(".pill")];
-const moodPills = pillsOf(choiceRow(0)), fluPills = pillsOf(choiceRow(1));
+const moodPills = pillsOf(choiceRow("Mood")), fluPills = pillsOf(choiceRow("Verbal Fluency"));
+const motPills = pillsOf(choiceRow("Motivation"));
+ok(motPills.map(b => b.textContent).join(",") === "Bad,Average,Good",
+   "Motivation offers the three verdicts and no N/A: " + motPills.map(b => b.textContent).join(","));
+ok(motPills.every(b => b.className === "pill"), "styled exactly like Mood's");
 ok(moodPills.length === 3, "Mood offers the three ratings: " + moodPills.map(b => b.textContent).join(","));
 ok(fluPills.length === 4, "Fluency offers those plus N/A: " + fluPills.map(b => b.textContent).join(","));
 // the rating pills must carry the same classes, so they inherit one style

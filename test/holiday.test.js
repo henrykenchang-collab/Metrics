@@ -18,8 +18,11 @@ function open(jar,cur,fakeToday){
        setItem:(k,v)=>{st[k]=String(v);},removeItem:k=>{delete st[k];}},configurable:true});}}).window;
   return {w,jar:jar||{}};
 }
-const fluPills=w=>[...w.document.getElementById("choices").children[1].querySelectorAll(".pill")];
-const moodPills=w=>[...w.document.getElementById("choices").children[0].querySelectorAll(".pill")];
+// by name, so adding a rating row cannot silently re-point these
+const choiceRow=(w,name)=>[...w.document.getElementById("choices").children]
+  .find(r=>r.querySelector(".rate-name").textContent===name);
+const fluPills=w=>[...choiceRow(w,"Verbal Fluency").querySelectorAll(".pill")];
+const moodPills=w=>[...choiceRow(w,"Mood").querySelectorAll(".pill")];
 const dow=w=>w.document.getElementById("dow").textContent;
 const day=(c,k)=>JSON.parse(c.jar["dailyReadout.v1"]||"{}")[k]||{};
 
