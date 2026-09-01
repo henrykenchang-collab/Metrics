@@ -420,6 +420,17 @@
     padding: 10px 16px; border-bottom: 1px solid var(--line); transition: background .12s ease;
   }
   .row:last-child { border-bottom: 0; }
+  .row { cursor: pointer; -webkit-user-select: none; user-select: none;
+         touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+  /* the excuse: a day the marker could not be asked for, not one you skipped,
+     so it is stated in the neutral grey N/A wears everywhere else */
+  .excuse {
+    flex: none; font-family: var(--mono); font-size: 10px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--ink-3); padding: 3px 7px; border-radius: 6px;
+    border: 1px dashed var(--line-2); transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .excuse[aria-pressed="true"] { background: var(--ink-3); border-color: var(--ink-3); color: var(--surface); border-style: solid; }
   .row:active { background: var(--surface-2); }
   .row-code { width: 34px; flex: none; color: var(--ink-3); transition: color .16s ease; }
   .row.on .row-code { color: var(--accent); }
@@ -807,8 +818,13 @@
        readout's due count, the guardrails and the export all walk MARKERS
        whole, so a grouped marker is a marker in every way that counts,
        except where `noGrid` says otherwise (below). */
+    /* An excuse is a day the marker was genuinely not askable, as opposed to
+       one you skipped: it makes the day not due, so it reads N/A and counts
+       nowhere -- not in the streak, the readout, the guardrails, the month
+       table or Patterns. */
     { key: "walkpm",      code: "WLK", name: "Walk with Shanti", sub: "PM",
-      days: [0, 1, 2, 3, 4, 5], group: "petrows" },
+      days: [0, 1, 2, 3, 4, 5], group: "petrows",
+      excuse: { key: "walkRain", label: "Rain" } },
     /* Weekly, not daily — due on Sunday only — and, being brand new
        practices as of today, `since` keeps any day before this one from
        ever reading as a lapse. `noGrid` keeps them off the month table:
@@ -1124,6 +1140,7 @@
     if (m.since && k < m.since) return false;
     if (m.days && m.days.indexOf(dow(k)) < 0) return false;
     if (m.noHoliday && holidayName(k)) return false;
+    if (m.excuse && data[k] && data[k][m.excuse.key]) return false;
     return true;
   }
 
@@ -1501,21 +1518,44 @@
     pillNodes[c.key] = nodes;
   });
 
-  var rowNodes = {};
+  var rowNodes = {}, excuseNodes = {};
+  /* A div rather than a button, because a marker carrying an excuse has a
+     second control inside it and a button cannot hold one. The row keeps its
+     whole-surface tap target either way -- the excuse stops the click from
+     reaching it, the same way the month arrows do inside a panel head. */
   MARKERS.forEach(function (m) {
-    var b = document.createElement("button");
-    b.className = "row"; b.type = "button";
+    var b = document.createElement("div");
+    b.className = "row";
+    b.setAttribute("role", "button");
+    b.setAttribute("tabindex", "0");
     b.setAttribute("aria-pressed", "false");
     b.innerHTML =
       '<span class="code row-code">' + m.code + '</span>' +
       '<span class="row-name">' + esc(m.name) + '<span class="row-sub"></span></span>' +
+      (m.excuse ? '<button class="excuse" type="button" aria-pressed="false">' +
+                  esc(m.excuse.label) + '</button>' : '') +
       '<span class="streak zero num">0d</span>' +
       '<span class="cell"><svg viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.2 5.2L20 7"/></svg></span>';
-    b.addEventListener("click", function () {
+    function toggle() {
       var d = day(cur);
       if (d[m.key]) delete d[m.key]; else d[m.key] = true;
       save(cur); render();
+    }
+    b.addEventListener("click", toggle);
+    b.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
     });
+    if (m.excuse) {
+      var ex = b.querySelector(".excuse");
+      ex.setAttribute("aria-label", m.name + ": " + m.excuse.label);
+      ex.addEventListener("click", function (e) {
+        e.stopPropagation();                       // excusing it is not doing it
+        var d = day(cur);
+        if (d[m.excuse.key]) delete d[m.excuse.key]; else d[m.excuse.key] = true;
+        save(cur); render();
+      });
+      excuseNodes[m.key] = ex;
+    }
     $(m.group || "rows").appendChild(b);
     rowNodes[m.key] = b;
   });
@@ -2136,6 +2176,9 @@
       node.classList.toggle("on", on);
       node.classList.toggle("notdue", !due);
       node.setAttribute("aria-pressed", on ? "true" : "false");
+      if (excuseNodes[m.key]) {
+        excuseNodes[m.key].setAttribute("aria-pressed", d[m.excuse.key] ? "true" : "false");
+      }
 
       /* the schedule rides on the name rather than under it; still quieter
          than the name, since it is a qualifier and not the thing itself */
@@ -2143,7 +2186,14 @@
       node.querySelector(".row-sub").textContent = tail ? ": " + tail : "";
 
       var tag = node.querySelector(".streak");
-      if (!due) {
+      /* A lit excuse already says the day is not due, and says why. A second
+         pill beside it repeats that and costs enough width to wrap the name
+         onto a line of its own. */
+      var excused = !!(m.excuse && d[m.excuse.key]);
+      tag.hidden = excused;
+      if (excused) {
+        /* nothing more to say */
+      } else if (!due) {
         tag.textContent = "Not Due";
         tag.className = "streak rest code";
       } else {
@@ -2391,8 +2441,12 @@
      ============================================================ */
   function analyze() {
     var spec = OUTCOMES.filter(function (o) { return o.v === outcome; })[0];
+    /* A day the marker was never due -- a weekend, a holiday, a day excused --
+       is not a day without it, and counting it as one drags the comparison
+       toward whatever those days happen to look like. `skip` drops them. */
     var factors = MARKERS.map(function (m) {
       return { label: markerLabel(m), kind: "marker",
+               skip: function (k) { return !isDue(m, k); },
                test: function (d) { return !!d[m.key]; } };
     });
     // a dose is continuous, so it enters the comparison as "took any vs none"
@@ -2416,6 +2470,7 @@
       keys.forEach(function (k) {
         var d = data[k];
         if (!logged(d)) return;
+        if (f.skip && f.skip(k)) return;
         var v = outcomeOf(data[shift(k, lag)], outcome);
         if (v === null) return;
         (f.test(d) ? a : b).push(v);
