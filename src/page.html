@@ -377,40 +377,44 @@
   .gauge { height: 3px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
   .gauge > i { display: block; height: 100%; width: 0; background: var(--violet); border-radius: 2px; transition: width .3s cubic-bezier(.2,.7,.3,1); }
 
-  /* ---------------- energy ---------------- */
-  .rate-row { display: flex; align-items: center; gap: 10px; padding: 9px 16px; border-top: 1px solid var(--line); }
+  /* ---------------- energy ----------------
+     Seven rows deep (four Energy + Work Productivity + Mood/Motivation/
+     Fluency), so this panel is the tallest thing on the page -- shrunk from
+     the general .rate-row/.seg/.pill sizing to fit more of it on a screen
+     without scrolling past it. */
+  .rate-row { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-top: 1px solid var(--line); }
   /* eight steps will not sit beside a label on a phone, so they get their own line */
-  .rate-row.scale { flex-direction: column; align-items: stretch; gap: 7px; padding: 10px 16px 12px; }
-  .rate-name { flex: 1; font-size: 14.5px; font-weight: 500; letter-spacing: -.01em; min-width: 0; }
-  .rate-name .row-sub { display: block; font-size: 11px; color: var(--ink-3); font-weight: 400; }
-  .meter { display: flex; gap: 5px; flex: none; }
-  .rate-row.scale .meter { display: grid; grid-template-columns: repeat(8, 1fr) 1.35fr; gap: 4px; }
+  .rate-row.scale { flex-direction: column; align-items: stretch; gap: 5px; padding: 7px 14px 8px; }
+  .rate-name { flex: 1; font-size: 13px; font-weight: 500; letter-spacing: -.01em; min-width: 0; }
+  .rate-name .row-sub { display: block; font-size: 10px; color: var(--ink-3); font-weight: 400; }
+  .meter { display: flex; gap: 4px; flex: none; }
+  .rate-row.scale .meter { display: grid; grid-template-columns: repeat(8, 1fr) 1.35fr; gap: 3px; }
   /* neutral, dashed, last: an opt-out rather than a ninth step, so it never
      reads as "worse than 1" */
   .ratenote {
-    width: 100%; font: inherit; font-size: 13px; padding: 6px 10px;
+    width: 100%; font: inherit; font-size: 12px; padding: 5px 9px;
     color: var(--ink); background: var(--surface-2);
-    border: 1px solid transparent; border-radius: 8px;
+    border: 1px solid transparent; border-radius: 7px;
     -webkit-appearance: none; appearance: none;
   }
   .ratenote::placeholder { color: var(--ink-3); }
   .ratenote:focus { border-color: var(--copper); }
 
-  .na-seg { border-style: dashed; color: var(--ink-3); font-size: 9.5px; letter-spacing: .03em; }
+  .na-seg { border-style: dashed; color: var(--ink-3); font-size: 8.5px; letter-spacing: .03em; }
   .na-seg.on { background: var(--ink-3); border-color: var(--ink-3); color: var(--surface); border-style: solid; }
-  .rate-row.scale .seg { width: auto; height: 34px; font-size: 11px; }
+  .rate-row.scale .seg { width: auto; height: 28px; font-size: 10px; }
   .seg {
-    width: 30px; height: 30px; border-radius: 8px;
+    width: 26px; height: 26px; border-radius: 7px;
     border: 1.5px solid var(--line-2); background: transparent;
     display: grid; place-items: center;
-    font-family: var(--mono); font-size: 11.5px; font-weight: 600; color: var(--ink-3);
+    font-family: var(--mono); font-size: 10.5px; font-weight: 600; color: var(--ink-3);
     transition: background .15s ease, border-color .15s ease, color .15s ease, transform .15s cubic-bezier(.2,.8,.3,1.4);
   }
   .seg.on { background: var(--copper); border-color: var(--copper); color: var(--surface); }
   .seg:active { transform: scale(.88); }
 
-  .pills { display: flex; gap: 4px; padding: 3px; background: var(--surface-2); border-radius: 11px; flex: none; }
-  .pill { padding: 6px 11px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); transition: background .15s ease, color .15s ease, transform .15s ease; }
+  .pills { display: flex; gap: 3px; padding: 3px; background: var(--surface-2); border-radius: 10px; flex: none; }
+  .pill { padding: 5px 9px; border-radius: 7px; font-size: 11.5px; font-weight: 600; color: var(--ink-2); transition: background .15s ease, color .15s ease, transform .15s ease; }
   .pill.on { background: var(--copper); color: var(--surface); }
   .pill:active { transform: scale(.94); }
 
@@ -612,10 +616,9 @@
 
   @media (max-width: 359px) {
     .stats { grid-template-columns: 1fr 1fr; }
-    .seg { width: 26px; height: 26px; }
+    .seg { width: 24px; height: 24px; }
     .rate-row { gap: 6px; }
-    .rate-row.scale .seg { width: auto; height: 30px; font-size: 10px; }
-    .rate-row.scale .meter { gap: 3px; }
+    .rate-row.scale .seg { width: auto; height: 26px; font-size: 9.5px; }
   }
   @media (prefers-reduced-motion: reduce) {
     * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
