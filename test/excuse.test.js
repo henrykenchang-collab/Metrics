@@ -30,7 +30,7 @@ function open(jar) {
         setItem: (k, v) => { st[k] = String(v); }, removeItem: k => { delete st[k]; } }, configurable: true }); } }).window;
   return { w, jar };
 }
-const row = (w, code) => [...w.document.querySelectorAll("#rows > *, #petrows > *")]
+const row = (w, code) => [...w.document.querySelectorAll("#rows > .row, #petrows > .row")]
   .find(b => b.querySelector(".row-code").textContent === code);
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
 const day = (c, k) => JSON.parse(c.jar["dailyReadout.v1"] || "{}")[k] || {};

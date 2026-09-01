@@ -45,7 +45,7 @@ ok(dow(c.w)==="Today" && !c.w.document.getElementById("dow").classList.contains(
 console.log("\n-- nothing else moved --");
 c=open({},{});
 setTimeout(()=>{
-  const sub=x=>[...c.w.document.getElementById("rows").children]
+  const sub=x=>[...c.w.document.getElementById("rows").querySelectorAll(".row")]
     .find(b=>b.querySelector(".row-code").textContent===x).querySelector(".row-sub").textContent.trim().replace(/^:\s*/,"");
   ok(sub("GRN")==="Sun · Mon · Wed","greens intact");
   ok(sub("SAU")==="Sun–Tue","sauna intact");

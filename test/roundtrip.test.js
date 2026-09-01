@@ -33,7 +33,7 @@ function open(html, jar, withCap) {
   return { w: dom.window, jar, box };
 }
 
-const row = (w, code) => [...w.document.getElementById("rows").children]
+const row = (w, code) => [...w.document.getElementById("rows").querySelectorAll(".row")]
   .find((b) => b.querySelector(".row-code").textContent === code);
 const tap = (w, code) => row(w, code).dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
 const syncNow = (w) => w.document.getElementById("syncBtn")
@@ -48,7 +48,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 (async () => {
   console.log("\n-- render --");
   let a = open(wrap(BUILT), {}, false);
-  ok(a.w.document.querySelectorAll("#rows > *, #petrows > *").length === 14, "14 marker rows rendered");
+  ok(a.w.document.querySelectorAll("#rows > .row, #petrows > .row").length === 14, "14 marker rows rendered");
   ok(/Sun–Tue/.test(a.w.document.getElementById("rows").textContent), 'sauna reads "Sun–Tue"');
   await wait(50);
   ok(a.w.document.getElementById("syncText").textContent === "This device only",

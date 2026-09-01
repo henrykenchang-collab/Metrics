@@ -27,7 +27,7 @@ function openOn(day, jar) {
         setItem: (k, v) => { st[k] = String(v); }, removeItem: k => { delete st[k]; } }, configurable: true }); } }).window;
   return { w, jar };
 }
-const row = w => [...w.document.querySelectorAll("#rows > *, #petrows > *")]
+const row = w => [...w.document.querySelectorAll("#rows > .row, #petrows > .row")]
   .find(b => b.querySelector(".row-code").textContent === "WWK");
 const title = w => row(w).querySelector(".row-name").textContent.trim();
 const notDue = w => row(w).classList.contains("notdue");

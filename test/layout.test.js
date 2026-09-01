@@ -12,7 +12,7 @@ function open(jar,sess){jar=jar||{};sess=sess||{};
        setItem:(k,v)=>{st[k]=String(v);},removeItem:k=>{delete st[k];}},configurable:true});}}).window;
   return {w,jar};
 }
-const sub=(w,c)=>{const r=[...w.document.getElementById("rows").children]
+const sub=(w,c)=>{const r=[...w.document.getElementById("rows").querySelectorAll(".row")]
   .find(b=>b.querySelector(".row-code").textContent===c);
   const s=r.querySelector(".row-sub"); return s&&s.textContent?s.textContent.trim().replace(/^:\s*/,""):null;};
 

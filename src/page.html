@@ -321,6 +321,32 @@
   .taginput:focus { border-color: var(--accent); }
   .tagsave { padding: 0 15px; border-radius: var(--r); background: var(--ink); color: var(--bg); font-size: 13px; font-weight: 600; }
 
+  /* ---------------- vitamin doses ----------------
+     A subsection under the Vitamins row, not a panel of its own -- same
+     fold pattern as Factors, at the same size, but teal rather than grey:
+     these are binary did-it items like every marker's own accent, just
+     starting lit instead of starting dark. */
+  /* no border-top of its own -- the Vitamins row above it already supplies
+     that divider with its own border-bottom, the same way every row in this
+     list only ever draws the line below it */
+  .vitwrap { padding: 4px 16px 10px; border-bottom: 1px solid var(--line); }
+  .vit-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    cursor: pointer; -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .vit-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .vit-head.shut .chev { transform: rotate(-90deg); }
+  .vit-body { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+  .vit-body[hidden] { display: none; }
+  .dose-pill {
+    font-size: 11px; font-weight: 500; padding: 4px 9px; border-radius: 999px;
+    border: 1px solid var(--line-2); color: var(--ink-2); background: transparent;
+    transition: background .14s ease, color .14s ease, border-color .14s ease, transform .14s ease;
+  }
+  .dose-pill.on { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+  .dose-pill:active { transform: scale(.94); }
+
   /* ---------------- sleep ---------------- */
   .times { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 10px; padding: 11px 16px 3px; }
   .field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
@@ -853,6 +879,25 @@
       days: [0], since: "2026-08-30", noGrid: true },
     { key: "shantiBrush", code: "SHA", name: "Shanti Brush", group: "petrows",
       days: [0], since: "2026-08-30", noGrid: true }
+  ];
+
+  /* The individual doses under Vitamins: a checklist, not a marker. They
+     never enter MARKERS on purpose -- no streak, no month-grid row, no
+     guardrail trend, no Patterns factor, no export column, none of the
+     machinery every other row on this page gets. Just today's list.
+
+     Checked is the default, since the ordinary day is every dose taken, so
+     only a SKIPPED dose is worth writing down -- the opposite of a marker,
+     which stores the day you DID something. Absent means checked; `false`
+     means skipped. */
+  var VITAMIN_DOSES = [
+    { key: "vitMag",         label: "Magnesium" },
+    { key: "vitADK",         label: "ADK" },
+    { key: "vitD",           label: "D" },
+    { key: "vitB1",          label: "B1" },
+    { key: "vitB12",         label: "B12" },
+    { key: "vitTheanine",    label: "Theanine" },
+    { key: "vitAshwagandha", label: "Ashwagandha" }
   ];
 
   var DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -1538,7 +1583,7 @@
     pillNodes[c.key] = nodes;
   });
 
-  var rowNodes = {}, excuseNodes = {};
+  var rowNodes = {}, excuseNodes = {}, doseNodes = {};
   /* A div rather than a button, because a marker carrying an excuse has a
      second control inside it and a button cannot hold one. The row keeps its
      whole-surface tap target either way -- the excuse stops the click from
@@ -1581,6 +1626,32 @@
     }
     $(m.group || "rows").appendChild(b);
     rowNodes[m.key] = b;
+
+    /* the dose checklist sits directly under the Vitamins row itself, not
+       at the bottom of the marker list -- it belongs to that row, not to
+       Daily Markers as a whole */
+    if (m.key === "vitamins") {
+      var vw = document.createElement("div");
+      vw.className = "vitwrap";
+      vw.innerHTML =
+        '<div class="vit-head" id="vitDosesHead" role="button" tabindex="0" aria-label="Doses">' +
+          '<span class="code" style="color:var(--ink-3)">Doses</span>' +
+        '</div>' +
+        '<div class="vit-body" id="vitDosesBody"></div>';
+      $("rows").appendChild(vw);
+      var vbody = vw.querySelector("#vitDosesBody");
+      VITAMIN_DOSES.forEach(function (v) {
+        var p = document.createElement("button");
+        p.className = "dose-pill"; p.type = "button"; p.textContent = v.label;
+        p.addEventListener("click", function () {
+          var d = day(cur);
+          if (d[v.key] === false) delete d[v.key]; else d[v.key] = false;
+          save(cur); render();
+        });
+        vbody.appendChild(p);
+        doseNodes[v.key] = p;
+      });
+    }
   });
 
   /* --- journal text: each pending write is bound to the day it was typed on,
@@ -2088,7 +2159,7 @@
      ============================================================ */
   var SHUTSTORE = "dailyReadout.shut";
   var SHUTINIT  = "dailyReadout.shutInit";
-  var DEFAULT_SHUT = ["vitaminSupply", "factors"];      // rolled up until you open it
+  var DEFAULT_SHUT = ["vitaminSupply", "factors", "vitDoses"];      // rolled up until you open it
   var shut = {};
   try {
     (JSON.parse(localStorage.getItem(SHUTSTORE) || "[]") || []).forEach(function (id) { shut[id] = 1; });
@@ -2229,6 +2300,13 @@
           tag.className = "streak num" + (s === 0 ? " zero" : s >= 3 ? " hot" : "");
         }
       }
+    });
+
+    VITAMIN_DOSES.forEach(function (v) {
+      var on = d[v.key] !== false;                    // absent = taken, by default
+      var p = doseNodes[v.key];
+      p.classList.toggle("on", on);
+      p.setAttribute("aria-pressed", on ? "true" : "false");
     });
 
     STATS.concat(STATS2).concat(EXTRAS).forEach(function (s) {
@@ -3146,6 +3224,25 @@
       head.setAttribute("aria-expanded", s ? "false" : "true");
     }
     function toggle() { setShut("factors", !isShut("factors")); paint(); }
+    head.addEventListener("click", toggle);
+    head.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+    });
+    paint();
+  })();
+
+  /* Vitamin doses fold the same way, sitting under a marker row rather
+     than a panel head. */
+  (function () {
+    var head = $("vitDosesHead"), body = $("vitDosesBody");
+    head.insertAdjacentHTML("beforeend", CHEV);
+    function paint() {
+      var s = isShut("vitDoses");
+      body.hidden = s;
+      head.classList.toggle("shut", s);
+      head.setAttribute("aria-expanded", s ? "false" : "true");
+    }
+    function toggle() { setShut("vitDoses", !isShut("vitDoses")); paint(); }
     head.addEventListener("click", toggle);
     head.addEventListener("keydown", function (e) {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }

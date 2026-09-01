@@ -26,7 +26,7 @@ function open(jar){ jar=jar||{};
        setItem:(k,v)=>{st[k]=String(v);},removeItem:k=>{delete st[k];}},configurable:true});}}).window;
   return {w,jar};
 }
-const row=(w,c)=>[...w.document.getElementById("rows").children]
+const row=(w,c)=>[...w.document.getElementById("rows").querySelectorAll(".row")]
   .find(b=>b.querySelector(".row-code").textContent===c);
 const tap=(w,c)=>row(w,c).dispatchEvent(new w.MouseEvent("click",{bubbles:true}));
 const segs=(w,i)=>[...w.document.getElementById("rates").children[i]
