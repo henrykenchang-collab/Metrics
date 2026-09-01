@@ -323,9 +323,10 @@
 
   /* ---------------- vitamin doses ----------------
      A subsection under the Vitamins row, not a panel of its own -- same
-     fold pattern as Factors, at the same size, but teal rather than grey:
-     these are binary did-it items like every marker's own accent, just
-     starting lit instead of starting dark. */
+     fold pattern as Factors. Holds a link to a reference sheet (start
+     date, dosage, brand, note) per vitamin -- this is settings a person
+     fills in once and revisits rarely, not a daily log entry, so it
+     carries no streak, checkbox or on/off state of its own. */
   /* no border-top of its own -- the Vitamins row above it already supplies
      that divider with its own border-bottom, the same way every row in this
      list only ever draws the line below it */
@@ -337,15 +338,28 @@
   }
   .vit-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
   .vit-head.shut .chev { transform: rotate(-90deg); }
-  .vit-body { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+  .vit-body { margin-top: 7px; }
   .vit-body[hidden] { display: none; }
-  .dose-pill {
-    font-size: 8px; font-weight: 500; padding: 3px 7px; border-radius: 999px;
-    border: 1px solid var(--line-2); color: var(--ink-2); background: transparent;
-    transition: background .14s ease, color .14s ease, border-color .14s ease, transform .14s ease;
+  .vit-link {
+    font-size: 11px; font-weight: 600; color: var(--accent); background: none; border: 0;
+    padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
   }
-  .dose-pill.on { background: var(--accent); border-color: var(--accent); color: var(--surface); }
-  .dose-pill:active { transform: scale(.94); }
+  .vit-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  .vit-details { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+  .vit-details[hidden] { display: none; }
+  .vit-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 8px 10px; }
+  .vit-card-name { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+  .vit-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; }
+  .vit-fields .field.full { grid-column: 1 / -1; }
+  .vit-fields .field > .code { font-size: 10px; }
+  .vitin {
+    font: 12px var(--sans); width: 100%; padding: 5px 7px; color: var(--ink);
+    background: var(--surface-2); border: 1px solid transparent; border-radius: 7px;
+    -webkit-appearance: none; appearance: none; min-height: 28px; box-sizing: border-box;
+  }
+  .vitin::placeholder { color: var(--ink-3); }
+  .vitin:focus { border-color: var(--accent); }
+  .vitin[type="date"] { font-family: var(--mono); }
 
   /* ---------------- sleep ---------------- */
   .times { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 10px; padding: 11px 16px 3px; }
@@ -881,15 +895,13 @@
       days: [0], since: "2026-08-30", noGrid: true }
   ];
 
-  /* The individual doses under Vitamins: a checklist, not a marker. They
-     never enter MARKERS on purpose -- no streak, no month-grid row, no
-     guardrail trend, no Patterns factor, no export column, none of the
-     machinery every other row on this page gets. Just today's list.
-
-     Checked is the default, since the ordinary day is every dose taken, so
-     only a SKIPPED dose is worth writing down -- the opposite of a marker,
-     which stores the day you DID something. Absent means checked; `false`
-     means skipped. */
+  /* The individual vitamins under Vitamins: a reference sheet, not a
+     marker. They never enter MARKERS on purpose -- no streak, no
+     month-grid row, no guardrail trend, no Patterns factor, no export
+     column, none of the machinery every other row on this page gets.
+     Each one just carries whatever start date, dosage, brand and note a
+     person filled in, in vitInfo, keyed by `key` below -- see
+     saveVitField(). */
   var VITAMIN_DOSES = [
     { key: "vitMag",         label: "Magnesium" },
     { key: "vitADK",         label: "ADK" },
@@ -1091,6 +1103,7 @@
 
   var STORE = "dailyReadout.v1";
   var TAGSTORE = "dailyReadout.tags";
+  var VITSTORE = "dailyReadout.vitInfo";
   var MIN_N = 3;         // days each side before a pattern factor is shown
   var MISS_LIMIT = 4;    // alert once a marker is missed MORE than this many due days running
   var WINDOW = 7;        // trend compares the last 7 days against the 7 before
@@ -1245,19 +1258,23 @@
      carries the shared copy, seeded into the page each time it saves.
      Days merge one at a time, newest write per day winning, so two devices
      working on different days never cost each other anything. */
-  var data = {}, customTags = [], warned = false;
+  var data = {}, customTags = [], vitInfo = {}, warned = false;
 
   function readSeed() {
-    var out = { days: {}, tags: [] }, el = document.getElementById("seed");
+    var out = { days: {}, tags: [], vitInfo: {} }, el = document.getElementById("seed");
     if (!el) return out;
     try {
       var s = JSON.parse(el.textContent || "{}") || {};
       if (s.days && typeof s.days === "object") out.days = s.days;
       if (s.tags && s.tags.length) out.tags = s.tags;
+      if (s.vitInfo && typeof s.vitInfo === "object") out.vitInfo = s.vitInfo;
     } catch (e) { /* a damaged seed must never cost the local copy */ }
     return out;
   }
 
+  // generic over any object keyed by id -> a record carrying its own STAMP;
+  // used for the day log and, since a vitamin's details carry the same
+  // shape, for that reference sheet too
   function mergeDays(base, over) {
     var out = {}, k;
     for (k in base) if (base.hasOwnProperty(k)) out[k] = base[k];
@@ -1275,20 +1292,37 @@
     }).join("|") + "#" + tags.slice().sort().join(",");
   }
 
-  var seeded = readSeed(), localDays = {}, localTags = [];
+  var seeded = readSeed(), localDays = {}, localTags = [], localVitInfo = {};
   try { localDays = JSON.parse(localStorage.getItem(STORE) || "{}") || {}; } catch (e) { localDays = {}; }
   try { localTags = JSON.parse(localStorage.getItem(TAGSTORE) || "[]") || []; } catch (e) { localTags = []; }
+  try { localVitInfo = JSON.parse(localStorage.getItem(VITSTORE) || "{}") || {}; } catch (e) { localVitInfo = {}; }
 
   // local wins a tie, so a device's own unsynced history is never dropped
   data = mergeDays(seeded.days, localDays);
   customTags = seeded.tags.slice();
   localTags.forEach(function (t) { if (customTags.indexOf(t) < 0) customTags.push(t); });
+  vitInfo = mergeDays(seeded.vitInfo, localVitInfo);
 
   function persistLocal() {
     try { localStorage.setItem(STORE, JSON.stringify(data)); }
     catch (e) { if (!warned) { warned = true; toast("No local copy on this device — syncing only."); } }
   }
   function saveTags() { try { localStorage.setItem(TAGSTORE, JSON.stringify(customTags)); } catch (e) {} }
+  function persistVitInfo() { try { localStorage.setItem(VITSTORE, JSON.stringify(vitInfo)); } catch (e) {} }
+
+  /* A vitamin's reference sheet, not a log entry: no schedule, no due date,
+     just whatever a person filled in. An entry lives only while at least
+     one field is non-empty, and carries its own STAMP for the same
+     newest-write-wins merge the day log uses. */
+  function vitEntered(e) { return !!(e.start || e.dose || e.brand || e.note); }
+  function saveVitField(k, field, v) {
+    var e = vitInfo[k] || {};
+    if (v) e[field] = v; else delete e[field];
+    if (vitEntered(e)) { e[STAMP] = Date.now(); vitInfo[k] = e; }
+    else { delete vitInfo[k]; }
+    persistVitInfo();
+    schedulePush();
+  }
 
   /* save(k) records that day k changed: stamp it, drop it if it went empty,
      rewrite the local copy, queue the sync. Called with no key it only
@@ -1376,7 +1410,8 @@
      browser that already had a log, or edits made offline. Flagged for the
      Sync Now button rather than published on load, since nobody has asked
      for a write yet. */
-  if (sig(data, customTags) !== sig(seeded.days, seeded.tags)) dirty = true;
+  if (sig(data, customTags) !== sig(seeded.days, seeded.tags) ||
+      sig(vitInfo, []) !== sig(seeded.vitInfo, [])) dirty = true;
 
   // hold the merged log locally right away, so a device that opens the page
   // and then loses signal still has every day it just read
@@ -1583,7 +1618,7 @@
     pillNodes[c.key] = nodes;
   });
 
-  var rowNodes = {}, excuseNodes = {}, doseNodes = {};
+  var rowNodes = {}, excuseNodes = {};
   /* A div rather than a button, because a marker carrying an excuse has a
      second control inside it and a button cannot hold one. The row keeps its
      whole-surface tap target either way -- the excuse stops the click from
@@ -1627,9 +1662,9 @@
     $(m.group || "rows").appendChild(b);
     rowNodes[m.key] = b;
 
-    /* the dose checklist sits directly under the Vitamins row itself, not
-       at the bottom of the marker list -- it belongs to that row, not to
-       Daily Markers as a whole */
+    /* the vitamin reference sheet sits directly under the Vitamins row
+       itself, not at the bottom of the marker list -- it belongs to that
+       row, not to Daily Markers as a whole */
     if (m.key === "vitamins") {
       var vw = document.createElement("div");
       vw.className = "vitwrap";
@@ -1637,19 +1672,48 @@
         '<div class="vit-head" id="vitDosesHead" role="button" tabindex="0" aria-label="Doses">' +
           '<span class="code" style="color:var(--ink-3)">Doses</span>' +
         '</div>' +
-        '<div class="vit-body" id="vitDosesBody"></div>';
+        '<div class="vit-body" id="vitDosesBody">' +
+          '<button class="vit-link" type="button" id="vitDetailsLink" aria-expanded="false">Vitamin Details</button>' +
+          '<div class="vit-details" id="vitDetailsBody" hidden></div>' +
+        '</div>';
       $("rows").appendChild(vw);
-      var vbody = vw.querySelector("#vitDosesBody");
+
+      var detailsBody = vw.querySelector("#vitDetailsBody");
       VITAMIN_DOSES.forEach(function (v) {
-        var p = document.createElement("button");
-        p.className = "dose-pill"; p.type = "button"; p.textContent = v.label;
-        p.addEventListener("click", function () {
-          var d = day(cur);
-          if (d[v.key] === false) delete d[v.key]; else d[v.key] = false;
-          save(cur); render();
-        });
-        vbody.appendChild(p);
-        doseNodes[v.key] = p;
+        var e = vitInfo[v.key] || {};
+        var card = document.createElement("div");
+        card.className = "vit-card";
+        card.innerHTML =
+          '<div class="vit-card-name">' + esc(v.label) + '</div>' +
+          '<div class="vit-fields">' +
+            '<label class="field"><span class="code">Start Date</span>' +
+              '<input class="vitin" type="date" data-k="' + v.key + '" data-f="start" ' +
+              'value="' + esc(e.start || "") + '" aria-label="' + esc(v.label) + ' start date"></label>' +
+            '<label class="field"><span class="code">Dosage</span>' +
+              '<input class="vitin" type="text" data-k="' + v.key + '" data-f="dose" placeholder="e.g. 200mg" ' +
+              'value="' + esc(e.dose || "") + '" aria-label="' + esc(v.label) + ' dosage"></label>' +
+            '<label class="field"><span class="code">Brand</span>' +
+              '<input class="vitin" type="text" data-k="' + v.key + '" data-f="brand" ' +
+              'value="' + esc(e.brand || "") + '" aria-label="' + esc(v.label) + ' brand"></label>' +
+            '<label class="field full"><span class="code">Note</span>' +
+              '<input class="vitin" type="text" data-k="' + v.key + '" data-f="note" placeholder="optional" ' +
+              'value="' + esc(e.note || "") + '" aria-label="' + esc(v.label) + ' note"></label>' +
+          '</div>';
+        detailsBody.appendChild(card);
+      });
+
+      // one delegated listener for every field, keyed by its data attributes
+      detailsBody.addEventListener("change", function (e) {
+        var t = e.target;
+        if (!t.classList.contains("vitin")) return;
+        saveVitField(t.dataset.k, t.dataset.f, t.value.trim());
+      });
+
+      var vitLink = vw.querySelector("#vitDetailsLink");
+      vitLink.addEventListener("click", function () {
+        var open = detailsBody.hidden;
+        detailsBody.hidden = !open;
+        vitLink.setAttribute("aria-expanded", open ? "true" : "false");
       });
     }
   });
@@ -2300,13 +2364,6 @@
           tag.className = "streak num" + (s === 0 ? " zero" : s >= 3 ? " hot" : "");
         }
       }
-    });
-
-    VITAMIN_DOSES.forEach(function (v) {
-      var on = d[v.key] !== false;                    // absent = taken, by default
-      var p = doseNodes[v.key];
-      p.classList.toggle("on", on);
-      p.setAttribute("aria-pressed", on ? "true" : "false");
     });
 
     STATS.concat(STATS2).concat(EXTRAS).forEach(function (s) {
@@ -3062,7 +3119,7 @@
   })();
 
   function buildDoc() {
-    var seed = JSON.stringify({ v: 1, days: data, tags: customTags }).replace(/<\//g, "<\\/");
+    var seed = JSON.stringify({ v: 1, days: data, tags: customTags, vitInfo: vitInfo }).replace(/<\//g, "<\\/");
     var open = "<" + "script", close = "<" + "/script>";
     return '<!doctype html><html><head><meta charset="utf-8">' +
            '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">' +
