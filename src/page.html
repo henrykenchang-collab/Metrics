@@ -289,10 +289,22 @@
   }
   .notes::placeholder { color: var(--ink-3); }
 
-  .tagwrap { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 9px; }
-  .taglist { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tagwrap { padding: 10px 16px 12px; display: flex; flex-direction: column; gap: 7px; }
+  /* a second, independent fold nested inside the Journal panel's own --
+     ~15 factor buttons are the least likely thing on the page to want open
+     before the day's actually been logged */
+  .factors-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    cursor: pointer; -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .factors-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .factors-head.shut .chev { transform: rotate(-90deg); }
+  .factors-body { display: flex; flex-direction: column; gap: 7px; margin-top: 7px; }
+  .factors-body[hidden] { display: none; }
+  .taglist { display: flex; flex-wrap: wrap; gap: 5px; }
   .tag {
-    font-size: 12.5px; font-weight: 500; padding: 5px 11px; border-radius: 999px;
+    font-size: 11px; font-weight: 500; padding: 4px 9px; border-radius: 999px;
     border: 1px solid var(--line-2); color: var(--ink-2); background: transparent;
     transition: background .14s ease, color .14s ease, border-color .14s ease, transform .14s ease;
   }
@@ -427,14 +439,15 @@
   .row { cursor: pointer; -webkit-user-select: none; user-select: none;
          touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
-  /* the excuse: a day the marker could not be asked for, not one you skipped,
-     so it is stated in the neutral grey N/A wears everywhere else */
+  /* the excuse: orange, so it reads as a state worth noticing rather than
+     the neutral grey N/A wears everywhere else -- excusing a day is still
+     a choice you made about it, not an absence of one */
   .excuse {
     flex: none; font-family: var(--mono); font-size: 10px; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--ink-3); padding: 3px 7px; border-radius: 6px;
-    border: 1px dashed var(--line-2); transition: background .15s ease, color .15s ease, border-color .15s ease;
+    text-transform: uppercase; color: var(--copper); padding: 3px 7px; border-radius: 6px;
+    border: 1px dashed var(--copper); transition: background .15s ease, color .15s ease, border-color .15s ease;
   }
-  .excuse[aria-pressed="true"] { background: var(--ink-3); border-color: var(--ink-3); color: var(--surface); border-style: solid; }
+  .excuse[aria-pressed="true"] { background: var(--copper); border-color: var(--copper); color: var(--surface); border-style: solid; }
   .row:active { background: var(--surface-2); }
   .row-code { width: 34px; flex: none; color: var(--ink-3); transition: color .16s ease; }
   .row.on .row-code { color: var(--accent); }
@@ -669,11 +682,15 @@
       <textarea class="notes" id="changed" rows="3" placeholder="How you felt, and anything that might explain it — new vitamin, a stressful call, short sleep, something you ate, travel, a skipped dose…"></textarea>
     </label>
     <div class="tagwrap">
-      <span class="code" style="color:var(--ink-3)">Factors — Tag Them and the Pattern Panel Can Test Them</span>
-      <div class="taglist" id="taglist"></div>
-      <div class="tagform" id="tagform" hidden>
-        <input class="taginput" id="taginput" placeholder="New Factor" maxlength="28" enterkeyhint="done">
-        <button class="tagsave" id="tagsave" type="button">Add</button>
+      <div class="factors-head" id="factorsHead" role="button" tabindex="0" aria-label="Factors — Tag Them and the Pattern Panel Can Test Them">
+        <span class="code" style="color:var(--ink-3)">Factors — Tag Them and the Pattern Panel Can Test Them</span>
+      </div>
+      <div class="factors-body" id="factorsBody">
+        <div class="taglist" id="taglist"></div>
+        <div class="tagform" id="tagform" hidden>
+          <input class="taginput" id="taginput" placeholder="New Factor" maxlength="28" enterkeyhint="done">
+          <button class="tagsave" id="tagsave" type="button">Add</button>
+        </div>
       </div>
     </div>
   </section>
@@ -1534,10 +1551,13 @@
     b.setAttribute("aria-pressed", "false");
     b.innerHTML =
       '<span class="code row-code">' + m.code + '</span>' +
+      /* the streak sits up by the code, left of the name it belongs to;
+         the excuse stays down by the checkbox it excuses, which is the
+         thing it actually changes */
+      '<span class="streak zero num">0d</span>' +
       '<span class="row-name">' + esc(m.name) + '<span class="row-sub"></span></span>' +
       (m.excuse ? '<button class="excuse" type="button" aria-pressed="false">' +
                   esc(m.excuse.label) + '</button>' : '') +
-      '<span class="streak zero num">0d</span>' +
       '<span class="cell"><svg viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.2 5.2L20 7"/></svg></span>';
     function toggle() {
       var d = day(cur);
@@ -2068,7 +2088,7 @@
      ============================================================ */
   var SHUTSTORE = "dailyReadout.shut";
   var SHUTINIT  = "dailyReadout.shutInit";
-  var DEFAULT_SHUT = ["vitaminSupply"];      // rolled up until you open it
+  var DEFAULT_SHUT = ["vitaminSupply", "factors"];      // rolled up until you open it
   var shut = {};
   try {
     (JSON.parse(localStorage.getItem(SHUTSTORE) || "[]") || []).forEach(function (id) { shut[id] = 1; });
@@ -3112,6 +3132,26 @@
   ["mprev", "mnext"].forEach(function (id) {
     $(id).addEventListener("click", function (e) { e.stopPropagation(); });
   });
+
+  /* Factors folds on its own, independently of the Journal panel it lives
+     inside -- wired the same way the panels above are, just not driven by
+     the generic loop, since it is not itself a section.panel. */
+  (function () {
+    var head = $("factorsHead"), body = $("factorsBody");
+    head.insertAdjacentHTML("beforeend", CHEV);
+    function paint() {
+      var s = isShut("factors");
+      body.hidden = s;
+      head.classList.toggle("shut", s);
+      head.setAttribute("aria-expanded", s ? "false" : "true");
+    }
+    function toggle() { setShut("factors", !isShut("factors")); paint(); }
+    head.addEventListener("click", toggle);
+    head.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+    });
+    paint();
+  })();
 
   var lastSeen = todayISO();
   setInterval(function () {

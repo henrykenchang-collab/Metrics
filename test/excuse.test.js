@@ -77,6 +77,34 @@ ok(plain.n <= 3, "the plain miss really does stop it: " + plain.n + "d");
 ok(!/Walk with Shanti/.test(r.w.document.getElementById("guard").textContent),
    "no guardrail miss: " + r.w.document.getElementById("guard").textContent.slice(0, 100));
 
+console.log("\n-- layout: the streak sits on the left, the excuse by the checkbox --");
+{
+  const x = open({});
+  const kids = [...row(x.w, "WLK").children].map(el => el.className);
+  const iCode = kids.findIndex(c2 => /\brow-code\b/.test(c2));
+  const iStreak = kids.findIndex(c2 => /\bstreak\b/.test(c2));
+  const iName = kids.findIndex(c2 => /\brow-name\b/.test(c2));
+  const iExcuse = kids.findIndex(c2 => /\bexcuse\b/.test(c2));
+  const iCell = kids.findIndex(c2 => /\bcell\b/.test(c2));
+  ok(iCode < iStreak && iStreak < iName, "code, then streak, then the name: " + kids.join(" | "));
+  ok(iExcuse === iCell - 1, "and the excuse sits directly before the checkbox: " + kids.join(" | "));
+  // a marker with no excuse keeps the same left-to-right code/streak/name/cell shape
+  const plain = [...row(x.w, "GYM").children].map(el => el.className);
+  const pStreak = plain.findIndex(c2 => /\bstreak\b/.test(c2)), pName = plain.findIndex(c2 => /\brow-name\b/.test(c2));
+  ok(pStreak < pName, "true of an ordinary row too, not just the one with an excuse: " + plain.join(" | "));
+}
+
+console.log("\n-- Rain is orange, in both states --");
+{
+  const css = HTML.replace(/\s+/g, " ");
+  const off = css.match(/\.excuse \{[^}]*\}/)[0];
+  ok(/color: var\(--copper\)/.test(off) && /border: 1px dashed var\(--copper\)/.test(off),
+     "unpressed: copper outline, not the neutral grey N/A wears: " + off);
+  const on = css.match(/\.excuse\[aria-pressed="true"\] \{[^}]*\}/)[0];
+  ok(/background: var\(--copper\)/.test(on) && /border-color: var\(--copper\)/.test(on),
+     "pressed: filled copper, not grey: " + on);
+}
+
 console.log("\n-- the excuse replaces the Not Due pill rather than sitting beside it --");
 {
   const x = open({});

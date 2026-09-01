@@ -107,5 +107,34 @@ c = open({ "dailyReadout.v1": JSON.stringify({ "2026-01-05": { vitamins: true, t
 const kept = JSON.parse(c.jar["dailyReadout.v1"])["2026-01-05"];
 ok((kept.tags || []).indexOf("Fruits") >= 0, "history is never rewritten, even for a retired label");
 
+console.log("\n-- Factors folds, and starts shut --");
+{
+  c = open({});
+  const head = c.w.document.getElementById("factorsHead");
+  const body = c.w.document.getElementById("factorsBody");
+  ok(!!head && !!body, "the fold control and its body exist");
+  ok(body.hidden === true, "shut on a log that has never been folded");
+  ok(head.querySelector(".chev"), "it carries a chevron like any other fold");
+  ok(head.getAttribute("aria-expanded") === "false", "and says so");
+  head.dispatchEvent(new c.w.MouseEvent("click", { bubbles: true }));
+  ok(body.hidden === false, "clicking it opens the tags");
+  ok(head.getAttribute("aria-expanded") === "true", "and says so");
+  ok(c.w.document.getElementById("taglist").children.length > 0,
+     "the tags were there all along, just hidden -- opening does not build them");
+  head.dispatchEvent(new c.w.MouseEvent("click", { bubbles: true }));
+  ok(body.hidden === true, "clicking again shuts it");
+  const stored = JSON.parse(c.jar["dailyReadout.shut"]);
+  ok(stored.indexOf("factors") >= 0, "the choice is remembered like any other fold: " + stored.join(", "));
+  ok(!c.jar["dailyReadout.v1"] || !/"factors"/.test(c.jar["dailyReadout.v1"]), "and never in the log");
+  // the default is applied once; after that it is the user's own choice
+  const again = open(c.jar);
+  const bodyAgain = again.w.document.getElementById("factorsBody");
+  again.w.document.getElementById("factorsHead").dispatchEvent(new again.w.MouseEvent("click", { bubbles: true }));
+  ok(bodyAgain.hidden === false, "opening it works on a fresh load too");
+}
+
+console.log("\n-- the factor pills are small --");
+ok(/\.tag \{[^}]*font-size: 11px/.test(HTML), "shrunk from the original 12.5px");
+
 console.log(fail ? "\n" + fail + " FAILED" : "\nall passed");
 process.exit(fail ? 1 : 0);

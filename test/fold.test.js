@@ -69,7 +69,7 @@ console.log("\n-- Vitamin Supply starts rolled up --");
 console.log("\n-- it is remembered, per device --");
 click(c.w,head(ps[3])); click(c.w,head(ps[5]));
 const stored=JSON.parse(c.jar["dailyReadout.shut"]);
-ok(stored.length===3,"the two just folded, plus Vitamin Supply: "+stored.join(", "));
+ok(stored.length===4,"the two just folded, plus Vitamin Supply and Factors: "+stored.join(", "));
 ok(!c.jar["dailyReadout.v1"]||!/shut/.test(c.jar["dailyReadout.v1"]),"and never into the log");
 const c2=open(c.jar);
 const p2=panels(c2.w);
