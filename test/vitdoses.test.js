@@ -111,7 +111,7 @@ console.log("\n-- none of it is tracked anywhere else --");
 }
 
 console.log("\n-- the dose pills are small --");
-ok(/\.dose-pill \{[^}]*font-size: 10px/.test(HTML), "kept small, a touch below the Factors tags' 11px");
+ok(/\.dose-pill \{[^}]*font-size: 8px/.test(HTML), "kept small, well below the Factors tags' 11px");
 
 console.log("\n-- and the export never mentions them --");
 c = open({ "dailyReadout.v1": JSON.stringify({ [TODAY]: { vitamins: true, vitB12: false, _t: 1 } }) });
