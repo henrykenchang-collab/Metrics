@@ -170,7 +170,11 @@ ok(sleepEl().querySelector(".tc-agg").textContent === "Last 13 weeks · weekly a
    "and names both the window and the bucket");
 
 pick(sleepEl(), "year");
-ok(dotsIn(sleepEl()) === 12, "a year is 12 months, plotted per month: " + dotsIn(sleepEl()));
+const monthsIn = (from, to) => { const seen = new Set(); let k = from;
+  while (k <= to) { seen.add(k.slice(0, 7)); k = shift(k, 1); } return seen.size; };
+const yearMonths = monthsIn(shift(TODAY, -364), TODAY);
+ok(dotsIn(sleepEl()) === yearMonths,
+   "a year is every month it touches, plotted per month: " + dotsIn(sleepEl()) + " of " + yearMonths);
 ok(sleepEl().querySelector(".tc-agg").textContent === "Last 12 months · monthly average", "same again");
 ok(dotsIn(hrvEl()) === 30, "the chart beside it is left on its own window");
 
@@ -182,7 +186,10 @@ c = open({ "dailyReadout.v1": JSON.stringify({
 click(c.w, c.w.document.getElementById("chartsLink"));
 ok(dotsIn(sleepEl()) === 2, "the month window ignores the reading 200 days back: " + dotsIn(sleepEl()));
 pick(sleepEl(), "year");
-ok(dotsIn(sleepEl()) === 2, "the year window picks it up, bucketed by month: " + dotsIn(sleepEl()));
+const seededMonths = new Set([TODAY, shift(TODAY, -3), shift(TODAY, -200)].map(k => k.slice(0, 7))).size;
+ok(dotsIn(sleepEl()) === seededMonths,
+   "the year window picks the old one up, one point per month it lands in: " +
+   dotsIn(sleepEl()) + " of " + seededMonths);
 const yearLabels = [...sleepEl().querySelectorAll(".tc-label")].map(t => t.textContent);
 ok(yearLabels.indexOf("50") >= 0, "and the old reading is in there: " + yearLabels.join(","));
 
@@ -204,7 +211,14 @@ pick(sleepEl(), "week");
 const wTicks = [...sleepEl().querySelectorAll(".tc-tick")].map(t => t.textContent);
 ok(wTicks.length >= 2, "a week gets day ticks, not one lonely month: " + wTicks.join(","));
 ok(/^[A-Za-z]{3} \d+$/.test(wTicks[0]), "the first names its month: " + wTicks[0]);
-ok(wTicks.slice(1).every(t => /^\d+$/.test(t)), "the rest are just day numbers: " + wTicks.join(","));
+// a bare day number, except where the week crosses into a new month -- which
+// is the whole point of naming it, so derive where that falls
+const weekDays = []; for (let i = 6; i >= 0; i--) weekDays.push(shift(TODAY, -i));
+const named = weekDays.filter((k, i) => i === 0 || k.slice(0, 7) !== weekDays[i - 1].slice(0, 7)).length;
+ok(wTicks.filter(t => /^[A-Za-z]{3} \d+$/.test(t)).length === named,
+   named + " tick(s) name a month, one per month the week touches: " + wTicks.join(","));
+ok(wTicks.filter(t => /^\d+$/.test(t)).length === wTicks.length - named,
+   "and the rest are bare day numbers: " + wTicks.join(","));
 pick(sleepEl(), "year");
 const yTicks = [...sleepEl().querySelectorAll(".tc-tick")].map(t => t.textContent);
 ok(yTicks.every(t => /^[A-Za-z]{3}( \d\d)?$/.test(t)), "a year gets month ticks: " + yTicks.join(","));

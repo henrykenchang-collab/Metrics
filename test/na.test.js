@@ -2,13 +2,25 @@ const fs=require("fs"), {JSDOM}=require("jsdom");
 const HTML=fs.readFileSync("/home/user/Metrics/daily-readout.html","utf8");
 let fail=0; const ok=(c,m)=>{console.log((c?"  PASS  ":"  FAIL  ")+m); if(!c)fail++;};
 const iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
-const back=n=>{const d=new Date();d.setDate(d.getDate()-n);return iso(d);};
-const TODAY=iso(new Date());
+/* The month grid shows one month, so days seeded a few back have to land
+   inside it. For most of the month "today" does that; on the 1st it does
+   not, and yesterday has no square to be looked up in. Near the boundary
+   the clock steps back into the previous month instead, and the page is
+   told the same time, so these stay tests of the grid rather than of the
+   date they happen to run on. */
+const NOW=(()=>{const d=new Date();
+  if(d.getDate()<=7){d.setDate(0);d.setDate(20);}   // the 20th of the month before
+  return d;})();
+const back=n=>{const d=new Date(NOW);d.setDate(d.getDate()-n);return iso(d);};
+const TODAY=iso(NOW);
 let copied="";
 function open(jar){jar=jar||{};
   const w=new JSDOM("<!doctype html><html><head><meta charset='utf-8'></head><body>"+HTML+"</body></html>",
    {runScripts:"dangerously",pretendToBeVisual:true,url:"https://a.test/",
     beforeParse(w){w.HTMLCanvasElement.prototype.getContext=()=>null;
+     const R=w.Date,f=TODAY+"T12:00:00";
+     function F(...a){return a.length?new R(...a):new R(f);}
+     F.prototype=R.prototype;F.now=()=>new R(f).getTime();F.parse=R.parse;F.UTC=R.UTC;w.Date=F;
      Object.defineProperty(w.navigator,"clipboard",{value:{writeText:t=>{copied=t;return Promise.resolve();}},configurable:true});
      for(const[n,st]of[["localStorage",jar],["sessionStorage",{}]])
       Object.defineProperty(w,n,{value:{getItem:k=>(k in st?st[k]:null),
@@ -50,6 +62,40 @@ const chips=c.w.document.getElementById("chips").textContent;
 ok(/ENG3\.0|ENG.*3/.test(chips.replace(/\s/g,"")),"energy averages 5 and 1 to 3.0, ignoring the N/A: "+chips.replace(/\s+/g," ").trim());
 click(c.w,na(c.w,4));                 // work = N/A
 ok(!/WRK/.test(c.w.document.getElementById("chips").textContent),'no "na/5" chip for work');
+
+console.log("\n-- Work Productivity has its own steps --");
+{
+  const w = open({}).w;
+  const stepsOf = i => [...w.document.getElementById("rates").children[i]
+    .querySelectorAll(".seg:not(.na-seg)")].map(b => b.textContent);
+  const energy = stepsOf(0), work = stepsOf(4);
+  ok(energy.join(",") === "1,2,2.5,3,3.5,4,4.5,5", "Energy keeps the original scale: " + energy.join(","));
+  ok(work.join(",") === "1,1.5,2,2.5,3,4,4.5,5", "Work Productivity gains 1.5 and drops 3.5: " + work.join(","));
+  ok(work.length === energy.length, "same number of steps, so the row is the same width");
+  // the four Energy rows must not have been dragged along with it
+  [0, 1, 2, 3].forEach(i => ok(stepsOf(i).indexOf("3.5") >= 0 && stepsOf(i).indexOf("1.5") < 0,
+    "Energy row " + i + " is untouched: " + stepsOf(i).join(",")));
+}
+{
+  // picking 1.5 records the number, and fills by position not by value
+  const c2 = open({});
+  const workRow = c2.w.document.getElementById("rates").children[4];
+  const steps = [...workRow.querySelectorAll(".seg:not(.na-seg)")];
+  steps[1].dispatchEvent(new c2.w.MouseEvent("click", { bubbles: true }));
+  ok(JSON.parse(c2.jar["dailyReadout.v1"])[TODAY].work === 1.5,
+     "1.5 is stored as the number 1.5: " + JSON.stringify(JSON.parse(c2.jar["dailyReadout.v1"])[TODAY].work));
+  ok(steps[0].classList.contains("on") && steps[1].classList.contains("on") && !steps[2].classList.contains("on"),
+     "and fills up to it, no further");
+}
+{
+  // a day already carrying 3.5 keeps the number -- it just has no step to sit
+  // on, which is why this went to Work Productivity alone
+  const kept = open({ "dailyReadout.v1": JSON.stringify({ [TODAY]: { work: 3.5, _t: 1 } }) });
+  ok(JSON.parse(kept.jar["dailyReadout.v1"])[TODAY].work === 3.5, "history is not rewritten");
+  const lit = [...kept.w.document.getElementById("rates").children[4]
+    .querySelectorAll(".seg.on")].length;
+  ok(lit === 0, "it simply reads as unrated on screen: " + lit + " steps lit");
+}
 
 console.log("\n-- the month grid ghosts it --");
 c=open({"dailyReadout.v1":JSON.stringify({

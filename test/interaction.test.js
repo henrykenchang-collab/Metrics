@@ -2,13 +2,25 @@ const fs=require("fs"), {JSDOM}=require("jsdom");
 const HTML=fs.readFileSync("/home/user/Metrics/daily-readout.html","utf8");
 let fail=0; const ok=(c,m)=>{console.log((c?"  PASS  ":"  FAIL  ")+m); if(!c)fail++;};
 const iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
-const back=n=>{const d=new Date();d.setDate(d.getDate()-n);return iso(d);};
-const TODAY=iso(new Date());
+/* The month grid shows one month, so days seeded a few back have to land
+   inside it. For most of the month "today" does that; on the 1st it does
+   not, and yesterday has no square to be looked up in. Near the boundary
+   the clock steps back into the previous month instead, and the page is
+   told the same time, so these stay tests of the grid rather than of the
+   date they happen to run on. */
+const NOW=(()=>{const d=new Date();
+  if(d.getDate()<=7){d.setDate(0);d.setDate(20);}   // the 20th of the month before
+  return d;})();
+const back=n=>{const d=new Date(NOW);d.setDate(d.getDate()-n);return iso(d);};
+const TODAY=iso(NOW);
 
 function open(jar){ jar=jar||{};
   const w=new JSDOM("<!doctype html><html><head><meta charset='utf-8'></head><body>"+HTML+"</body></html>",
    {runScripts:"dangerously",pretendToBeVisual:true,url:"https://a.test/",
     beforeParse(w){w.HTMLCanvasElement.prototype.getContext=()=>null;
+     const R=w.Date,f=TODAY+"T12:00:00";
+     function F(...a){return a.length?new R(...a):new R(f);}
+     F.prototype=R.prototype;F.now=()=>new R(f).getTime();F.parse=R.parse;F.UTC=R.UTC;w.Date=F;
      for(const[n,st] of [["localStorage",jar],["sessionStorage",{}]])
       Object.defineProperty(w,n,{value:{getItem:k=>(k in st?st[k]:null),
        setItem:(k,v)=>{st[k]=String(v);},removeItem:k=>{delete st[k];}},configurable:true});}}).window;

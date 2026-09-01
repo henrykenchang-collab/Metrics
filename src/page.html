@@ -875,13 +875,21 @@
     { key: "ePM",   code: "E3", name: "Energy", sub: "Work PM" },
     { key: "ePost", code: "E4", name: "Energy", sub: "Post Work" }
   ];
-  var RATINGS = ENERGY.concat([{ key: "work", code: "WRK", name: "Work Productivity" }]);
+  var SCALE = [1, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+  /* Work Productivity asks a different question from Energy and wants its
+     steps in a different place: finer down low, where the answers actually
+     land, and no 3.5. Its own array rather than a change to SCALE, because
+     the Energy rows have real history at 3.5 and a value with no step to sit
+     on renders as unrated. */
+  var WORK_SCALE = [1, 1.5, 2, 2.5, 3, 4, 4.5, 5];
+  function scaleFor(r) { return r.scale || SCALE; }
+
+  var RATINGS = ENERGY.concat([{ key: "work", code: "WRK", name: "Work Productivity", scale: WORK_SCALE }]);
 
   /* Eight steps rather than five. Coarse at the bottom, where the difference
      between a 1 and a 2 is obvious, and half-points from 2 up, where the
      distinctions you actually make live. Stored as the number, so an old 1-5
      entry is already on the scale. */
-  var SCALE = [1, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 
   /* N/A is a statement, blank is a silence. "I was not working" and "I never
      said" both belong out of the averages, but only one of them is something
@@ -1418,7 +1426,7 @@
     var meter = document.createElement("div");
     meter.className = "meter";
     var segs = [];
-    SCALE.forEach(function (n) {
+    scaleFor(r).forEach(function (n) {
       var b = document.createElement("button");
       b.className = "seg"; b.type = "button"; b.textContent = String(n);
       b.setAttribute("aria-label", ratingLabel(r) + ": " + n + " out of 5");
@@ -2169,7 +2177,7 @@
       var shown = ratingLabelFor(r, cur);
       nameNodes[r.key].textContent = shown;
       segNodes[r.key].forEach(function (sg, i) {
-        sg.setAttribute("aria-label", shown + ": " + SCALE[i] + " out of 5");
+        sg.setAttribute("aria-label", shown + ": " + scaleFor(r)[i] + " out of 5");
       });
       naNodes[r.key].setAttribute("aria-label", shown + ": not applicable");
       noteNodes[r.key].setAttribute("aria-label", shown + ": note");
@@ -2177,7 +2185,7 @@
       /* fill by position, not by value — the steps are not evenly spaced */
       var val = d[r.key];
       if (val === undefined && r.key === "work" && isOffDay(cur)) val = NA;
-      var idx = typeof val === "number" ? SCALE.indexOf(val) : -1;
+      var idx = typeof val === "number" ? scaleFor(r).indexOf(val) : -1;
       segNodes[r.key].forEach(function (s, i) {
         s.classList.toggle("on", i <= idx);
         s.setAttribute("aria-pressed", i === idx ? "true" : "false");
