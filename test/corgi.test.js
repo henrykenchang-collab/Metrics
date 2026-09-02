@@ -60,6 +60,25 @@ setTimeout(()=>{
      || [...w.document.querySelectorAll(".shanti-mark")].length===1,
      "she appears once, in her own panel, and nowhere else");
 
+  console.log("\n-- Buddha, right next to her --");
+  const buddha=petHead.querySelector(".buddha-mark");
+  ok(!!buddha,"he is drawn there too");
+  ok(buddha.tagName.toLowerCase()==="svg","inline, not a fetched image");
+  ok(buddha.getAttribute("aria-hidden")==="true","hidden from a screen reader; the heading already names him");
+  const kids=[...petHead.querySelector(".code").children];
+  ok(kids.indexOf(shanti)===0 && kids.indexOf(buddha)===1,
+     "Shanti first, Buddha right after her, both before the words");
+  ok(buddha.querySelectorAll("[fill]").length>10,"a full-colour drawing, not a one-tone mark: "+buddha.querySelectorAll("[fill]").length+" filled parts");
+  // his ids must not collide with hers or anything else on the page
+  ["bdHead","bdCream"].forEach(id=>
+    ok(w.document.querySelectorAll("#"+id).length===1,id+" is unique in the document"));
+  ok([...w.document.querySelectorAll(".buddha-mark")].length===1,
+     "he appears once, in the same panel, and nowhere else");
+  // a cat, not a second corgi: round ears and whiskers, neither of which
+  // Shanti's drawing has
+  ok(buddha.querySelectorAll("g[stroke] path").length>=6,
+     "carries whiskers -- thin strokes Shanti's corgi mark has none of");
+
   console.log("\n-- the tracker still works --");
   ok(w.document.querySelectorAll("#rows > .row, #petrows > .row").length===14,"14 markers still render");
   const sub=c=>[...w.document.getElementById("rows").querySelectorAll(".row")]

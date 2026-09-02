@@ -70,6 +70,11 @@ ok(/Average Resting Heart Rate/.test(guard(back.w).textContent),
    "the alert is still there to be read once opened");
 ok(!/NaN/.test(guard(back.w).innerHTML), "no NaN");
 
+console.log("\n-- condensed, to take up less room --");
+ok(/\.guard-head \{[^}]*padding: 8px 16px 7px/.test(HTML), "the head's padding is tightened");
+ok(/\.alert-row \{[^}]*padding: 7px 16px/.test(HTML), "so is each alert row's");
+ok(/\.alert-name \{[^}]*font-size: 13px/.test(HTML), "and the alert name shrunk a point");
+
 console.log("\n-- the panels are untouched by it --");
 const shutList = JSON.parse(back.jar["dailyReadout.shut"]);
 ok(shutList.indexOf("guard") >= 0 && shutList.indexOf("vitaminSupply") >= 0,
