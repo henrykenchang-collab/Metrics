@@ -141,9 +141,10 @@
   .today-btn[hidden] { display: none; }
 
   /* ---------------- trend charts view ---------------- */
-  #chartsView { display: flex; flex-direction: column; gap: 13px; }
-  #chartsView .head { justify-content: space-between; }
+  #chartsView, #lessonsView { display: flex; flex-direction: column; gap: 13px; }
+  #chartsView .head, #lessonsView .head { justify-content: space-between; }
   .chartsTitle { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+  .lessonsFor { color: var(--ink-3); padding: 0 2px; margin: -6px 0 0; }
 
   .trend-chart {
     background: var(--surface); border: 1px solid var(--line);
@@ -201,10 +202,12 @@
   .score-n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 40px; font-weight: 700; line-height: 1; letter-spacing: -.04em; }
   .score-d { font-family: var(--mono); font-size: 16px; color: var(--ink-3); font-weight: 500; }
   .readout-meta { flex: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-  .readout-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-  .readout-label { color: var(--ink-3); }
-  /* the same understated link treatment as "Back to Today" — a way out of
-     the current view, not an action taken on it */
+  .readout-label-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .readout-label { color: var(--ink-3); padding-top: 1px; }
+  /* Lessons Learned sits right underneath Trend Charts, the same understated
+     link treatment as "Back to Today" — a way out of the current view, not
+     an action taken on it */
+  .viewlinks { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
   .viewlink { flex: none; color: var(--ink-3); border-bottom: 1px dashed var(--line-2); display: inline-flex; align-items: center; gap: 5px; }
   /* the corgi from the ground behind the page, cropped to his head: the whole
      dog at this size is a blob, but the two ears still read at 14px. Inked
@@ -236,7 +239,6 @@
   .alert-name { font-size: 13px; font-weight: 600; letter-spacing: -.01em; }
   .alert-detail { font-size: 11.5px; color: var(--ink-2); line-height: 1.35; }
   .alert-detail b { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700; color: var(--neg); }
-  .guard-note { padding: 8px 16px 9px; color: var(--ink-3); font-size: 10.5px; line-height: 1.45; }
 
   /* ---------------- panels ---------------- */
   .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
@@ -480,6 +482,16 @@
   .row.on .row-code { color: var(--accent); }
   .row-name { flex: 1; font-size: 15px; font-weight: 500; letter-spacing: -.01em; }
   .row-sub { font-size: 11.5px; color: var(--ink-3); font-weight: 400; letter-spacing: 0; }
+  /* the start date reads as plain grey text, like the schedule beside it,
+     until it is tapped -- a native date field underneath is what makes it
+     editable without a control of its own */
+  .mstart {
+    font: 10.5px var(--mono); color: var(--ink-3); background: none; border: none;
+    padding: 0; margin-left: 5px; width: 92px; cursor: pointer; vertical-align: middle;
+    -webkit-appearance: none; appearance: none;
+  }
+  .mstart::-webkit-calendar-picker-indicator { opacity: .55; }
+  .mstart:focus-visible { outline: 1px dashed var(--line-2); outline-offset: 2px; border-radius: 3px; }
   /* a marker that isn't due today: still tappable, visibly optional */
   .row.notdue .row-name { color: var(--ink-2); }
   .row.notdue .cell { border-style: dashed; }
@@ -723,7 +735,10 @@
       <div class="readout-meta">
         <div class="readout-label-row">
           <span class="code readout-label">Markers Due Today</span>
-          <button class="code viewlink" id="chartsLink" type="button"><svg class="corgi-mark" viewBox="19 1 62 65" aria-hidden="true"><path d="M29 31 21 6c-.6-2.6 2-4 4.1-2.4L45.5 20Z"/><path d="M71 31 79 6c.6-2.6-2-4-4.1-2.4L54.5 20Z"/><circle cx="50" cy="41" r="23"/></svg>Trend Charts →</button>
+          <div class="viewlinks">
+            <button class="code viewlink" id="chartsLink" type="button"><svg class="corgi-mark" viewBox="19 1 62 65" aria-hidden="true"><path d="M29 31 21 6c-.6-2.6 2-4 4.1-2.4L45.5 20Z"/><path d="M71 31 79 6c.6-2.6-2-4-4.1-2.4L54.5 20Z"/><circle cx="50" cy="41" r="23"/></svg>Trend Charts →</button>
+            <button class="code viewlink" id="lessonsLink" type="button">Lessons Learned →</button>
+          </div>
         </div>
         <div class="bar"><i id="scoreBar" style="width:0%"></i></div>
         <span class="readout-note" id="note">Nothing logged yet.</span>
@@ -851,6 +866,44 @@
     <button class="code viewlink" id="backToDaily" type="button">← Daily Readout</button>
   </header>
   <div id="trendCharts"></div>
+</div>
+
+<div id="lessonsView" hidden>
+  <header class="head">
+    <span class="code chartsTitle">Lessons Learned</span>
+    <button class="code viewlink" id="backFromLessons" type="button">← Daily Readout</button>
+  </header>
+  <p class="code lessonsFor" id="lessonsFor"></p>
+
+  <section class="panel">
+    <div class="panel-head"><span class="code">Lessons Learned: Positive</span></div>
+    <label class="jfield">
+      <span class="code">What Went Well</span>
+      <textarea class="notes" id="lessonsPosText" rows="3" placeholder="What worked, and why it might have"></textarea>
+    </label>
+    <div class="tagwrap">
+      <div class="taglist" id="lessonsPosTagList"></div>
+      <div class="tagform" id="lessonsPosTagForm" hidden>
+        <input class="taginput" id="lessonsPosTagInput" placeholder="New Tag" maxlength="28" enterkeyhint="done">
+        <button class="tagsave" id="lessonsPosTagSave" type="button">Add</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><span class="code">Lessons Learned: Negative</span></div>
+    <label class="jfield">
+      <span class="code">What Didn't</span>
+      <textarea class="notes" id="lessonsNegText" rows="3" placeholder="What went sideways, and why it might have"></textarea>
+    </label>
+    <div class="tagwrap">
+      <div class="taglist" id="lessonsNegTagList"></div>
+      <div class="tagform" id="lessonsNegTagForm" hidden>
+        <input class="taginput" id="lessonsNegTagInput" placeholder="New Tag" maxlength="28" enterkeyhint="done">
+        <button class="tagsave" id="lessonsNegTagSave" type="button">Add</button>
+      </div>
+    </div>
+  </section>
 </div>
 
 </div>
@@ -1135,6 +1188,8 @@
   var TAGSTORE = "dailyReadout.tags";
   var VITSTORE = "dailyReadout.vitInfo";
   var FOODSTORE = "dailyReadout.customFoods";
+  var MARKSTORE = "dailyReadout.markerStart";
+  var LESSONTAGSTORE = "dailyReadout.lessonTags";
   var MIN_N = 3;         // days each side before a pattern factor is shown
   var MISS_LIMIT = 4;    // alert once a marker is missed MORE than this many due days running
   var WINDOW = 7;        // trend compares the last 7 days against the 7 before
@@ -1253,6 +1308,22 @@
     return true;
   }
 
+  /* A hardcoded `since` in the schema above is a start date already in
+     place; `markerStart` is the same idea, but set from the row itself and
+     synced like everything else, and it wins when both are present. Whether
+     a marker is due is unaffected either way -- the checkbox, the Markers
+     Due Today count and the month grid all read exactly as they did before
+     this existed. What a start date gates is whether a due day is worth
+     counting toward the streak or a Guardrails lapse: see counts() below. */
+  function effectiveStart(m) {
+    var ov = markerStart[m.key];
+    return (ov && ov.date) || m.since || null;
+  }
+  function counts(m, k) {
+    var start = effectiveStart(m);
+    return isDue(m, k) && !!start && k >= start;
+  }
+
   var WORKWEEK = "1,2,3,4,5";
   function scheduleText(m) {
     var sorted = m.days ? m.days.slice().sort(function (a, b) { return a - b; }) : null;
@@ -1289,17 +1360,19 @@
      carries the shared copy, seeded into the page each time it saves.
      Days merge one at a time, newest write per day winning, so two devices
      working on different days never cost each other anything. */
-  var data = {}, customTags = [], customFoods = [], vitInfo = {}, warned = false;
+  var data = {}, customTags = [], customFoods = [], customLessonTags = [], vitInfo = {}, markerStart = {}, warned = false;
 
   function readSeed() {
-    var out = { days: {}, tags: [], customFoods: [], vitInfo: {} }, el = document.getElementById("seed");
+    var out = { days: {}, tags: [], customFoods: [], lessonTags: [], vitInfo: {}, markerStart: {} }, el = document.getElementById("seed");
     if (!el) return out;
     try {
       var s = JSON.parse(el.textContent || "{}") || {};
       if (s.days && typeof s.days === "object") out.days = s.days;
       if (s.tags && s.tags.length) out.tags = s.tags;
       if (s.customFoods && s.customFoods.length) out.customFoods = s.customFoods;
+      if (s.lessonTags && s.lessonTags.length) out.lessonTags = s.lessonTags;
       if (s.vitInfo && typeof s.vitInfo === "object") out.vitInfo = s.vitInfo;
+      if (s.markerStart && typeof s.markerStart === "object") out.markerStart = s.markerStart;
     } catch (e) { /* a damaged seed must never cost the local copy */ }
     return out;
   }
@@ -1324,11 +1397,13 @@
     }).join("|") + "#" + tags.slice().sort().join(",");
   }
 
-  var seeded = readSeed(), localDays = {}, localTags = [], localFoods = [], localVitInfo = {};
+  var seeded = readSeed(), localDays = {}, localTags = [], localFoods = [], localLessonTags = [], localVitInfo = {}, localMarkerStart = {};
   try { localDays = JSON.parse(localStorage.getItem(STORE) || "{}") || {}; } catch (e) { localDays = {}; }
   try { localTags = JSON.parse(localStorage.getItem(TAGSTORE) || "[]") || []; } catch (e) { localTags = []; }
   try { localFoods = JSON.parse(localStorage.getItem(FOODSTORE) || "[]") || []; } catch (e) { localFoods = []; }
+  try { localLessonTags = JSON.parse(localStorage.getItem(LESSONTAGSTORE) || "[]") || []; } catch (e) { localLessonTags = []; }
   try { localVitInfo = JSON.parse(localStorage.getItem(VITSTORE) || "{}") || {}; } catch (e) { localVitInfo = {}; }
+  try { localMarkerStart = JSON.parse(localStorage.getItem(MARKSTORE) || "{}") || {}; } catch (e) { localMarkerStart = {}; }
 
   // local wins a tie, so a device's own unsynced history is never dropped
   data = mergeDays(seeded.days, localDays);
@@ -1336,7 +1411,10 @@
   localTags.forEach(function (t) { if (customTags.indexOf(t) < 0) customTags.push(t); });
   customFoods = seeded.customFoods.slice();
   localFoods.forEach(function (f) { if (customFoods.indexOf(f) < 0) customFoods.push(f); });
+  customLessonTags = seeded.lessonTags.slice();
+  localLessonTags.forEach(function (t) { if (customLessonTags.indexOf(t) < 0) customLessonTags.push(t); });
   vitInfo = mergeDays(seeded.vitInfo, localVitInfo);
+  markerStart = mergeDays(seeded.markerStart, localMarkerStart);
 
   function persistLocal() {
     try { localStorage.setItem(STORE, JSON.stringify(data)); }
@@ -1344,7 +1422,19 @@
   }
   function saveTags() { try { localStorage.setItem(TAGSTORE, JSON.stringify(customTags)); } catch (e) {} }
   function saveFoods() { try { localStorage.setItem(FOODSTORE, JSON.stringify(customFoods)); } catch (e) {} }
+  function saveLessonTags() { try { localStorage.setItem(LESSONTAGSTORE, JSON.stringify(customLessonTags)); } catch (e) {} }
   function persistVitInfo() { try { localStorage.setItem(VITSTORE, JSON.stringify(vitInfo)); } catch (e) {} }
+  function persistMarkerStart() { try { localStorage.setItem(MARKSTORE, JSON.stringify(markerStart)); } catch (e) {} }
+
+  /* A marker's start date, set from its own row. Kept in the same shape as
+     the vitamin reference sheet -- a record carrying its own STAMP -- so it
+     merges through mergeDays() exactly the same way across two devices. */
+  function saveMarkerStart(key, v) {
+    if (v) { var e = { date: v }; e[STAMP] = Date.now(); markerStart[key] = e; }
+    else { delete markerStart[key]; }
+    persistMarkerStart();
+    schedulePush();
+  }
 
   /* A vitamin's reference sheet, not a log entry: no schedule, no due date,
      just whatever a person filled in. An entry lives only while at least
@@ -1458,13 +1548,43 @@
   if (migrated) save();
   if (tagsDirty) saveTags();
 
+  /* A marker with a hardcoded `since` already has a start date in place.
+     Everything else is backfilled from the earliest day it already has data
+     for -- so a marker already being tracked doesn't go quiet the moment a
+     start date became required. Idempotent (it only ever fills a gap, never
+     overwrites a value already there, from code or from a person), so it is
+     safe to call again on every boot and right before every publish rather
+     than needing a one-time flag: once any device has published a value for
+     a key, every other device finds it already there and leaves it alone. */
+  function backfillMarkerStart() {
+    var loggedDays = null, earliestAny, changed = false;
+    MARKERS.forEach(function (m) {
+      if (m.since || markerStart[m.key]) return;
+      if (!loggedDays) { loggedDays = Object.keys(data).sort(); earliestAny = loggedDays[0] || null; }
+      var earliest = null;
+      loggedDays.some(function (k) {
+        if (data[k] && data[k][m.key] !== undefined) { earliest = k; return true; }
+        return false;
+      });
+      var start = earliest || earliestAny;
+      if (start) {
+        var e = { date: start }; e[STAMP] = Date.now();
+        markerStart[m.key] = e; changed = true;
+      }
+    });
+    if (changed) persistMarkerStart();
+  }
+  backfillMarkerStart();
+
   /* Days this device has that the artifact does not — a first run on a
      browser that already had a log, or edits made offline. Flagged for the
      Sync Now button rather than published on load, since nobody has asked
      for a write yet. */
   if (sig(data, customTags) !== sig(seeded.days, seeded.tags) ||
       sig(vitInfo, []) !== sig(seeded.vitInfo, []) ||
-      customFoods.slice().sort().join("|") !== seeded.customFoods.slice().sort().join("|")) dirty = true;
+      sig(markerStart, []) !== sig(seeded.markerStart, []) ||
+      customFoods.slice().sort().join("|") !== seeded.customFoods.slice().sort().join("|") ||
+      customLessonTags.slice().sort().join("|") !== seeded.lessonTags.slice().sort().join("|")) dirty = true;
 
   // hold the merged log locally right away, so a device that opens the page
   // and then loses signal still has every day it just read
@@ -1671,7 +1791,7 @@
     pillNodes[c.key] = nodes;
   });
 
-  var rowNodes = {}, excuseNodes = {};
+  var rowNodes = {}, excuseNodes = {}, startNodes = {}, vitWrapNode = null;
   /* A div rather than a button, because a marker carrying an excuse has a
      second control inside it and a button cannot hold one. The row keeps its
      whole-surface tap target either way -- the excuse stops the click from
@@ -1684,7 +1804,11 @@
     b.setAttribute("aria-pressed", "false");
     b.innerHTML =
       '<span class="code row-code">' + m.code + '</span>' +
-      '<span class="row-name">' + esc(m.name) + '<span class="row-sub"></span></span>' +
+      '<span class="row-name">' + esc(m.name) + '<span class="row-sub"></span>' +
+        /* a marker counts toward its streak, trend and Guardrails only once
+           this is set -- grey, like the schedule caption beside it, since
+           it is a qualifier on the marker rather than the marker itself */
+        '<input class="mstart code" type="date" aria-label="' + esc(m.name) + ' start date"></span>' +
       (m.excuse ? '<button class="excuse" type="button" aria-pressed="false">' +
                   esc(m.excuse.label) + '</button>' : '') +
       /* both sit right before the checkbox: the streak is what the
@@ -1712,6 +1836,14 @@
       });
       excuseNodes[m.key] = ex;
     }
+    var st = b.querySelector(".mstart");
+    // picking a date is not marking the day done, and must not open the picker's own click through to the row
+    st.addEventListener("click", function (e) { e.stopPropagation(); });
+    st.addEventListener("change", function () {
+      saveMarkerStart(m.key, st.value);
+      render();
+    });
+    startNodes[m.key] = st;
     $(m.group || "rows").appendChild(b);
     rowNodes[m.key] = b;
 
@@ -1721,6 +1853,7 @@
     if (m.key === "vitamins") {
       var vw = document.createElement("div");
       vw.className = "vitwrap";
+      vitWrapNode = vw;
       vw.innerHTML =
         '<div class="vit-head" id="vitDosesHead" role="button" tabindex="0" aria-label="Vitamin Details">' +
           '<span class="code" style="color:var(--ink-3)">Vitamin Details</span>' +
@@ -2048,12 +2181,14 @@
   function onTrack(m, k) { var v = didIt(m, k); return m.invert ? !v : v; }
 
   /* Consecutive DUE days on which the marker was on track. Days the marker
-     isn't scheduled are stepped over, so Saturday never breaks a streak. */
+     isn't scheduled are stepped over, so Saturday never breaks a streak.
+     Days before its start date are stepped over the same way -- a marker
+     with no start date in place yet simply never has anything to count. */
   function streak(m) {
     var n = 0, k = todayISO(), scanned = 0;
-    if (isDue(m, k) && !onTrack(m, k)) k = shift(k, -1);  // today still open
+    if (counts(m, k) && !onTrack(m, k)) k = shift(k, -1);  // today still open
     while (scanned++ < SCAN) {
-      if (isDue(m, k)) {
+      if (counts(m, k)) {
         if (onTrack(m, k)) n++; else break;
       }
       k = shift(k, -1);
@@ -2067,7 +2202,7 @@
   function missStreak(m) {
     var n = 0, k = todayISO(), scanned = 0;
     while (scanned++ < SCAN) {
-      if (isDue(m, k) && logged(data[k])) {
+      if (counts(m, k) && logged(data[k])) {
         if (onTrack(m, k)) break;
         n++;
       }
@@ -2426,10 +2561,7 @@
                 '<span class="alert-detail">' + a.detail + '</span>' +
               '</span></div>';
     });
-    html += '<p class="guard-note">Misses count only days a marker is scheduled and you logged. ' +
-            'Trends compare the last 7 days against the 7 before, and need at least ' + TREND_MIN +
-            ' readings in each. For heart rate a rise is the flag; for everything else a fall is.</p>' +
-            '</div>';
+    html += '</div>';
     host.innerHTML = html;
     wireGuardFold(host);
   }
@@ -2478,6 +2610,7 @@
     $("todayBtn").hidden = isToday;
     $("next").disabled = isToday;
 
+    var dueRows = [], notDueRows = [];
     MARKERS.forEach(function (m) {
       var on = !!d[m.key], due = isDue(m, cur), node = rowNodes[m.key];
       node.classList.toggle("on", on);
@@ -2491,6 +2624,8 @@
          than the name, since it is a qualifier and not the thing itself */
       var tail = markerSub(m, cur);                       // target can vary by weekday
       node.querySelector(".row-sub").textContent = tail ? ": " + tail : "";
+      var startVal = effectiveStart(m) || "";
+      if (startNodes[m.key].value !== startVal) startNodes[m.key].value = startVal;
 
       var tag = node.querySelector(".streak");
       /* A lit excuse already says the day is not due, and says why. A second
@@ -2513,6 +2648,15 @@
           tag.className = "streak num" + (s === 0 ? " zero" : s >= 3 ? " hot" : "");
         }
       }
+
+      if ((m.group || "rows") === "rows") (due ? dueRows : notDueRows).push(node);
+    });
+    /* not-due markers sink to the bottom, so what is actually worth acting
+       on today stays together at the top -- Vitamin Details rides along
+       right after the Vitamins row, wherever that lands */
+    dueRows.concat(notDueRows).forEach(function (node) {
+      $("rows").appendChild(node);
+      if (node === rowNodes.vitamins && vitWrapNode) $("rows").appendChild(vitWrapNode);
     });
 
     STATS.concat(STATS2).concat(EXTRAS).forEach(function (s) {
@@ -3060,6 +3204,106 @@
   });
 
   /* ============================================================
+     Lessons Learned — a third view, one page per day like the Journal
+     panel it borrows its shape from, just for the two things worth
+     pulling out of that single box: what worked, and what didn't. Each
+     half carries its own freeform note and its own pick of tags, drawn
+     from one shared, growing vocabulary the same way Factors and the meal
+     categories build theirs — typed once, offered on every day after.
+     ============================================================ */
+  function lessonsField(p) { return p === "Pos" ? "lessonsPos" : "lessonsNeg"; }
+  function lessonsTagField(p) { return p === "Pos" ? "lessonsPosTags" : "lessonsNegTags"; }
+
+  function allLessonTags() {
+    var seen = {}, out = [];
+    customLessonTags.forEach(function (t) {
+      var n = String(t).trim();
+      if (n && !seen[n.toLowerCase()]) { seen[n.toLowerCase()] = 1; out.push(n); }
+    });
+    return out;
+  }
+
+  function renderLessonTags(p) {
+    var on = (data[cur] || {})[lessonsTagField(p)] || [];
+    var host = $("lessons" + p + "TagList");
+    host.innerHTML = "";
+    allLessonTags().forEach(function (t) {
+      var b = document.createElement("button");
+      b.className = "tag" + (on.indexOf(t) >= 0 ? " on" : "");
+      b.type = "button"; b.textContent = t;
+      b.setAttribute("aria-pressed", on.indexOf(t) >= 0 ? "true" : "false");
+      b.addEventListener("click", function () {
+        var dd = day(cur), field = lessonsTagField(p);
+        dd[field] = dd[field] || [];
+        var i = dd[field].indexOf(t);
+        if (i >= 0) dd[field].splice(i, 1); else dd[field].push(t);
+        if (!dd[field].length) delete dd[field];
+        save(cur);
+        renderLessonTags(p);
+      });
+      host.appendChild(b);
+    });
+    var add = document.createElement("button");
+    add.className = "tag add"; add.type = "button"; add.textContent = "+ New Tag";
+    add.addEventListener("click", function () { $("lessons" + p + "TagForm").hidden = false; $("lessons" + p + "TagInput").focus(); });
+    host.appendChild(add);
+  }
+
+  function addLessonTag(p) {
+    var input = $("lessons" + p + "TagInput"), form = $("lessons" + p + "TagForm");
+    var v = input.value.trim();
+    if (!v) { form.hidden = true; return; }
+    if (!allLessonTags().some(function (t) { return t.toLowerCase() === v.toLowerCase(); })) {
+      customLessonTags.push(v); saveLessonTags();
+    }
+    var canon = allLessonTags().filter(function (t) { return t.toLowerCase() === v.toLowerCase(); })[0] || v;
+    var dd = day(cur), field = lessonsTagField(p);
+    dd[field] = dd[field] || [];
+    if (dd[field].indexOf(canon) < 0) dd[field].push(canon);
+    save(cur);
+    input.value = ""; form.hidden = true;
+    // the vocabulary is shared, so a tag typed on one side is immediately
+    // offered on the other -- not just after the view is reopened
+    renderLessonTags("Pos");
+    renderLessonTags("Neg");
+  }
+
+  ["Pos", "Neg"].forEach(function (p) {
+    var ta = $("lessons" + p + "Text");
+    ta.addEventListener("input", function () {
+      var d = day(cur), field = lessonsField(p);
+      if (ta.value.trim()) d[field] = ta.value; else delete d[field];
+      save(cur);
+    });
+    $("lessons" + p + "TagSave").addEventListener("click", function () { addLessonTag(p); });
+    $("lessons" + p + "TagInput").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); addLessonTag(p); }
+    });
+  });
+
+  function renderLessons() {
+    $("lessonsFor").textContent = "For " +
+      fromISO(cur).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+    var d = data[cur] || {};
+    $("lessonsPosText").value = d.lessonsPos || "";
+    $("lessonsNegText").value = d.lessonsNeg || "";
+    $("lessonsPosTagForm").hidden = true;
+    $("lessonsNegTagForm").hidden = true;
+    renderLessonTags("Pos");
+    renderLessonTags("Neg");
+  }
+
+  $("lessonsLink").addEventListener("click", function () {
+    $("dailyView").hidden = true;
+    $("lessonsView").hidden = false;
+    renderLessons();
+  });
+  $("backFromLessons").addEventListener("click", function () {
+    $("lessonsView").hidden = true;
+    $("dailyView").hidden = false;
+  });
+
+  /* ============================================================
      Navigation
      ============================================================ */
   $("prev").addEventListener("click", function () { cur = shift(cur, -1); render(); });
@@ -3247,7 +3491,9 @@
   })();
 
   function buildDoc() {
-    var seed = JSON.stringify({ v: 1, days: data, tags: customTags, customFoods: customFoods, vitInfo: vitInfo }).replace(/<\//g, "<\\/");
+    backfillMarkerStart();     // whatever this device now knows, published as canon
+    var seed = JSON.stringify({ v: 1, days: data, tags: customTags, customFoods: customFoods,
+      lessonTags: customLessonTags, vitInfo: vitInfo, markerStart: markerStart }).replace(/<\//g, "<\\/");
     var open = "<" + "script", close = "<" + "/script>";
     return '<!doctype html><html><head><meta charset="utf-8">' +
            '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">' +

@@ -48,7 +48,9 @@ ok(c.w.document.getElementById("extras").children.length===2,"the two dose field
 ok(/Extra IR/.test(txt)&&/Extra XR/.test(txt),"each still carries its own label");
 
 console.log("\n== 4. Vitamin Supply condensed and last ==");
-const panels=[...c.w.document.querySelectorAll("section.panel")];
+// scoped to the daily view: Lessons Learned is its own view now, with two
+// panels of its own that this ordering check has nothing to do with
+const panels=[...c.w.document.getElementById("dailyView").querySelectorAll("section.panel")];
 const heads=panels.map(p=>p.querySelector(".panel-head .code").textContent);
 ok(heads[heads.length-1]==="Vitamin Supply","Vitamin Supply is the last panel: "+heads.join(" | "));
 ok(heads.indexOf("Patterns")===heads.length-2,"and sits directly under Patterns");

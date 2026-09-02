@@ -12,7 +12,9 @@ function open(jar){jar=jar||{};
        setItem:(k,v)=>{st[k]=String(v);},removeItem:k=>{delete st[k];}},configurable:true});}}).window;
   return {w,jar};
 }
-const panels=w=>[...w.document.querySelectorAll("section.panel")];
+// scoped to the daily view: Lessons Learned is its own view now, with two
+// panels of its own that fold has nothing to do with
+const panels=w=>[...w.document.getElementById("dailyView").querySelectorAll("section.panel")];
 const head=p=>p.querySelector(".panel-head");
 const body=p=>p.querySelector(".panel-body");
 const click=(w,el)=>el.dispatchEvent(new w.MouseEvent("click",{bubbles:true}));
