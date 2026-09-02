@@ -35,6 +35,21 @@ console.log("\n-- the link sits right under Trend Charts --");
      "labelled plainly");
 }
 
+console.log("\n-- actually hidden, not just marked hidden --");
+{
+  // `display: flex` on its own beats the browser's built-in
+  // `[hidden] { display: none }` -- author CSS always wins over that
+  // default, whatever the specificity -- so both views need their own
+  // `[hidden]` rule restating it, or jsdom's `.hidden === true` above
+  // would be true while a real browser renders the view anyway, stacked
+  // right under the daily view it was supposed to replace.
+  const css = HTML.replace(/\s+/g, " ");
+  ok(/#chartsView\[hidden\], ?#lessonsView\[hidden\] \{[^}]*display: none/.test(css) ||
+     (/#chartsView\[hidden\][^{,]*\{[^}]*display: none/.test(css) &&
+      /#lessonsView\[hidden\][^{,]*\{[^}]*display: none/.test(css)),
+     "both carry an explicit [hidden] rule");
+}
+
 console.log("\n-- opening it --");
 {
   const c = open({});

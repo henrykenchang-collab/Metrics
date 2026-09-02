@@ -141,7 +141,12 @@
   .today-btn[hidden] { display: none; }
 
   /* ---------------- trend charts view ---------------- */
+  /* `display: flex` on its own would win over the browser's built-in
+     `[hidden] { display: none }` -- author CSS always beats that default,
+     regardless of specificity -- so `[hidden]` needs saying again here, the
+     same as every other toggled element on the page. */
   #chartsView, #lessonsView { display: flex; flex-direction: column; gap: 13px; }
+  #chartsView[hidden], #lessonsView[hidden] { display: none; }
   #chartsView .head, #lessonsView .head { justify-content: space-between; }
   .chartsTitle { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
   .lessonsFor { color: var(--ink-3); padding: 0 2px; margin: -6px 0 0; }
