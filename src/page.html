@@ -341,15 +341,8 @@
   }
   .vit-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
   .vit-head.shut .chev { transform: rotate(-90deg); }
-  .vit-body { margin-top: 7px; }
+  .vit-body { margin-top: 7px; display: flex; flex-direction: column; gap: 8px; }
   .vit-body[hidden] { display: none; }
-  .vit-link {
-    font-size: 11px; font-weight: 600; color: var(--accent); background: none; border: 0;
-    padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
-  }
-  .vit-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-  .vit-details { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
-  .vit-details[hidden] { display: none; }
   .vit-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 8px 10px; }
   .vit-card-name { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
   .vit-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; }
@@ -1672,16 +1665,13 @@
       var vw = document.createElement("div");
       vw.className = "vitwrap";
       vw.innerHTML =
-        '<div class="vit-head" id="vitDosesHead" role="button" tabindex="0" aria-label="Doses">' +
-          '<span class="code" style="color:var(--ink-3)">Doses</span>' +
+        '<div class="vit-head" id="vitDosesHead" role="button" tabindex="0" aria-label="Vitamin Details">' +
+          '<span class="code" style="color:var(--ink-3)">Vitamin Details</span>' +
         '</div>' +
-        '<div class="vit-body" id="vitDosesBody">' +
-          '<button class="vit-link" type="button" id="vitDetailsLink" aria-expanded="false">Vitamin Details</button>' +
-          '<div class="vit-details" id="vitDetailsBody" hidden></div>' +
-        '</div>';
+        '<div class="vit-body" id="vitDosesBody"></div>';
       $("rows").appendChild(vw);
 
-      var detailsBody = vw.querySelector("#vitDetailsBody");
+      var detailsBody = vw.querySelector("#vitDosesBody");
       VITAMIN_DOSES.forEach(function (v) {
         var e = vitInfo[v.key] || {};
         var card = document.createElement("div");
@@ -1710,13 +1700,6 @@
         var t = e.target;
         if (!t.classList.contains("vitin")) return;
         saveVitField(t.dataset.k, t.dataset.f, t.value.trim());
-      });
-
-      var vitLink = vw.querySelector("#vitDetailsLink");
-      vitLink.addEventListener("click", function () {
-        var open = detailsBody.hidden;
-        detailsBody.hidden = !open;
-        vitLink.setAttribute("aria-expanded", open ? "true" : "false");
       });
     }
   });

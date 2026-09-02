@@ -1,6 +1,10 @@
-/* The vitamin reference sheet under Vitamins: a link that opens a card per
-   vitamin (Magnesium, ADK, D, B1, B12, Theanine, Ashwagandha) with Start
-   Date, Dosage, Brand and an optional Note. Unlike the old daily checklist
+/* The vitamin reference sheet under Vitamins: a fold labeled "Vitamin
+   Details" that opens directly onto a card per vitamin (Magnesium, ADK, D,
+   B1, B12, Theanine, Ashwagandha) with Start Date, Dosage, Brand and an
+   optional Note. One fold, not two -- an earlier version nested a
+   "Vitamin Details" link inside a separately-folding "Doses" header, which
+   was redundant; the head itself now reads "Vitamin Details" and opening it
+   is opening the cards, nothing in between. Unlike the old daily checklist
    this replaced, it is settings, not a log entry -- no day it belongs to,
    no streak, no month-grid row, no guardrail trend, no Patterns factor, no
    export column. This guards the form itself, that it stays untracked
@@ -27,6 +31,7 @@ const card = (w, label) => [...w.document.querySelectorAll(".vit-card")]
 const field = (w, label, f) => card(w, label).querySelector('.vitin[data-f="' + f + '"]');
 const change = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event("change", { bubbles: true })); };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+const openHead = w => click(w, w.document.getElementById("vitDosesHead"));
 const vitInfo = c => JSON.parse(c.jar["dailyReadout.vitInfo"] || "{}");
 const day = (c, k) => JSON.parse(c.jar["dailyReadout.v1"] || "{}")[k] || {};
 
@@ -40,37 +45,33 @@ ok(iVitwrap === iVit + 1, "the reference sheet is the very next thing: index " +
 ok(!c.w.document.getElementById("vitDosesHead").closest(".row"),
    "it is its own block, not inside the Vitamins row itself");
 
-console.log("\n-- the Doses fold still shuts, same as before --");
+console.log("\n-- one fold, reading Vitamin Details, no nested link --");
 {
   const head = c.w.document.getElementById("vitDosesHead");
   const body = c.w.document.getElementById("vitDosesBody");
+  ok(head.querySelector(".code").textContent === "Vitamin Details",
+     "the head itself reads Vitamin Details: " + JSON.stringify(head.querySelector(".code").textContent));
+  ok(head.getAttribute("aria-label") === "Vitamin Details", "and says so for a screen reader too");
+  ok(!c.w.document.getElementById("vitDetailsLink"), "the old nested link is gone");
+  ok(!c.w.document.querySelector(".vit-link"), "and so is its class");
   ok(body.hidden === true, "shut on a log that has never been folded");
   ok(head.querySelector(".chev"), "carries a chevron like every other fold");
+  ok(head.getAttribute("role") === "button", "announces as a button");
   click(c.w, head);
-  ok(body.hidden === false, "opens on click");
+  ok(body.hidden === false, "one click opens it -- straight onto the cards");
+  ok(c.w.document.querySelectorAll("#vitDosesBody .vit-card").length === 7,
+     "all seven cards are right there, nothing further to open");
   click(c.w, head);
   ok(body.hidden === true, "and shuts again");
 }
 
-console.log("\n-- no tags left -- a link instead --");
+console.log("\n-- no tags left either --");
 c = open({});
 ok(!c.w.document.querySelector(".dose-pill"), "the old toggle pills are gone");
-const link = c.w.document.getElementById("vitDetailsLink");
-ok(!!link, "a Vitamin Details link is there");
-ok(link.tagName.toLowerCase() === "button" && link.textContent === "Vitamin Details",
-   "reads Vitamin Details: " + JSON.stringify(link.textContent));
-const details = c.w.document.getElementById("vitDetailsBody");
-ok(details.hidden === true, "the sheet starts closed");
-ok(link.getAttribute("aria-expanded") === "false", "and says so");
-click(c.w, link);
-ok(details.hidden === false, "opens on click");
-ok(link.getAttribute("aria-expanded") === "true", "and now says so");
-click(c.w, link);
-ok(details.hidden === true, "closes again on a second click");
 
 console.log("\n-- all seven vitamins, each with four fields --");
 c = open({});
-click(c.w, c.w.document.getElementById("vitDetailsLink"));
+openHead(c.w);
 const names = ["Magnesium", "ADK", "D", "B1", "B12", "Theanine", "Ashwagandha"];
 ok(names.every(n => !!card(c.w, n)), "all seven get a card: " + names.filter(n => !card(c.w, n)).join(","));
 const one = card(c.w, "Magnesium");
@@ -84,7 +85,7 @@ ok(names.every(n => ["start", "dose", "brand", "note"].every(f => field(c.w, n, 
 
 console.log("\n-- filling in a field records it, keyed by vitamin --");
 c = open({});
-click(c.w, c.w.document.getElementById("vitDetailsLink"));
+openHead(c.w);
 change(c.w, field(c.w, "Magnesium", "start"), "2026-06-01");
 change(c.w, field(c.w, "Magnesium", "dose"), "200mg");
 change(c.w, field(c.w, "Magnesium", "brand"), "Now Foods");
@@ -98,24 +99,24 @@ ok(!("vitADK" in stored), "an untouched vitamin stays absent entirely");
 
 console.log("\n-- and the note is genuinely optional --");
 c = open({});
-click(c.w, c.w.document.getElementById("vitDetailsLink"));
+openHead(c.w);
 change(c.w, field(c.w, "D", "dose"), "5000IU");
 ok(vitInfo(c).vitD.dose === "5000IU" && !("note" in vitInfo(c).vitD),
    "a dosage with no note is still saved, note simply absent");
 
 console.log("\n-- clearing every field drops the entry --");
 c = open({ "dailyReadout.vitInfo": JSON.stringify({ vitB1: { dose: "100mg", _t: 1 } }) });
-click(c.w, c.w.document.getElementById("vitDetailsLink"));
+openHead(c.w);
 ok(field(c.w, "B1", "dose").value === "100mg", "the saved dose comes back into the field");
 change(c.w, field(c.w, "B1", "dose"), "");
 ok(!("vitB1" in vitInfo(c)), "clearing the only field removes the vitamin from storage entirely");
 
 console.log("\n-- it survives a reload, same device --");
 c = open({});
-click(c.w, c.w.document.getElementById("vitDetailsLink"));
+openHead(c.w);
 change(c.w, field(c.w, "B12", "brand"), "Nature Made");
 const again = open(c.jar);
-click(again.w, again.w.document.getElementById("vitDetailsLink"));
+openHead(again.w);
 ok(field(again.w, "B12", "brand").value === "Nature Made", "the brand is still there next load");
 
 console.log("\n-- it rides in the seed, alongside days and tags --");
@@ -130,14 +131,14 @@ console.log("\n-- it rides in the seed, alongside days and tags --");
        for (const n of ["localStorage", "sessionStorage"])
         Object.defineProperty(w, n, { value: { getItem: k => (k in jar ? jar[k] : null),
          setItem: (k, v) => { jar[k] = String(v); }, removeItem: k => { delete jar[k]; } }, configurable: true }); } }).window;
-  click(w2, w2.document.getElementById("vitDetailsLink"));
+  openHead(w2);
   ok(field(w2, "Theanine", "dose").value === "400mg" && field(w2, "Theanine", "brand").value === "Suntheanine",
      "a vitamin seeded from a published copy reads back into its card");
 }
 
-console.log("\n-- clicking a field never touches the Vitamins marker or today's log --");
+console.log("\n-- filling in a field never touches the Vitamins marker or today's log --");
 c = open({});
-click(c.w, c.w.document.getElementById("vitDetailsLink"));
+openHead(c.w);
 change(c.w, field(c.w, "Ashwagandha", "dose"), "600mg");
 ok(day(c, TODAY).vitamins === undefined, "the Vitamins row itself is untouched");
 ok(Object.keys(day(c, TODAY)).length === 0, "and nothing lands in today's day record at all");
