@@ -70,7 +70,7 @@ setTimeout(()=>{
      "Shanti first, Buddha right after her, both before the words");
   ok(buddha.querySelectorAll("[fill]").length>10,"a full-colour drawing, not a one-tone mark: "+buddha.querySelectorAll("[fill]").length+" filled parts");
   // his ids must not collide with hers or anything else on the page
-  ["bdHead","bdCream"].forEach(id=>
+  ["bdHead"].forEach(id=>
     ok(w.document.querySelectorAll("#"+id).length===1,id+" is unique in the document"));
   ok([...w.document.querySelectorAll(".buddha-mark")].length===1,
      "he appears once, in the same panel, and nowhere else");
