@@ -213,17 +213,6 @@
   .bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
   .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width .3s cubic-bezier(.2,.7,.3,1); }
   .readout-note { color: var(--ink-2); font-size: 12.5px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; border-top: 1px solid var(--line); padding-top: 10px; }
-  .chip {
-    font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums;
-    padding: 3px 8px; border-radius: 6px; background: var(--surface-2); color: var(--ink-2);
-    display: inline-flex; gap: 5px; align-items: baseline;
-  }
-  .chip b { font-weight: 700; color: var(--ink); }
-  .chip.v { background: var(--violet-dim); } .chip.v b { color: var(--violet); }
-  .chip.c { background: var(--copper-dim); } .chip.c b { color: var(--copper); }
-  .chip.a { background: var(--accent-dim); } .chip.a b { color: var(--accent); }
-  .chips:empty { display: none; }
 
   /* ---------------- guardrails ---------------- */
   .guard { border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
@@ -704,7 +693,6 @@
         <span class="readout-note" id="note">Nothing logged yet.</span>
       </div>
     </div>
-    <div class="chips" id="chips"></div>
   </section>
 
   <!-- GUARDRAILS — warnings need to be seen, so they sit above the journal -->
@@ -2429,27 +2417,6 @@
     $("scoreN").textContent = done;
     $("scoreD").textContent = "/" + due;
     $("scoreBar").style.width = (due ? done / due * 100 : 0) + "%";
-
-    var chips = [], bedM = inBed(d.bed, d.wake);
-    if (bedM !== null) chips.push('<span class="chip v"><span>BED</span><b>' + hm(bedM) + '</b></span>');
-    if (d.sleep !== undefined) chips.push('<span class="chip v"><span>SLP</span><b>' + d.sleep + '</b></span>');
-    if (d.cpap !== undefined) chips.push('<span class="chip v"><span>CPAP</span><b>' + d.cpap + '</b></span>');
-    if (d.hrv !== undefined) chips.push('<span class="chip v"><span>HRV</span><b>' + d.hrv + '</b></span>');
-    if (d.hr !== undefined) chips.push('<span class="chip v"><span>HR</span><b>' + d.hr + '</b></span>');
-    var ae = avgEnergy(d);
-    if (ae !== null) chips.push('<span class="chip c"><span>ENG</span><b>' + ae.toFixed(1) + '</b></span>');
-    if (ratingNum(d.work)) chips.push('<span class="chip c"><span>WRK</span><b>' + d.work + '/5</b></span>');
-    CHOICE_ROWS.forEach(function (c) {
-      if (d[c.key] && d[c.key] !== NA) {
-        chips.push('<span class="chip c"><span>' + c.code + '</span><b>' + choiceLabel(d[c.key]) + '</b></span>');
-      }
-    });
-    EXTRAS.forEach(function (x) {
-      if (d[x.key] !== undefined) {
-        chips.push('<span class="chip a"><span>' + x.code + '</span><b>' + d[x.key] + ' mg</b></span>');
-      }
-    });
-    $("chips").innerHTML = chips.join("");
 
     var note = done === due ? "All " + due + " due markers done."
       : done === 0 ? "None of today's " + due + " due markers yet."

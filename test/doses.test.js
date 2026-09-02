@@ -66,12 +66,10 @@ sleep.value="-40"; sleep.dispatchEvent(new c.w.Event("input",{bubbles:true}));
 ok(sleep.value==="40","sleep score refuses a minus sign: "+sleep.value);
 ok(store(c).sleep===40,"and stores the positive");
 
-console.log("\n-- chips and export --");
+console.log("\n-- export --");
 c=open({});
 const x=c.w.document.querySelectorAll("#extras .dosein")[1];
 x.value="-20"; x.dispatchEvent(new c.w.Event("input",{bubbles:true}));
-ok(/XR-20mg/.test(c.w.document.getElementById("chips").textContent.replace(/\s/g,"")),
-   "the summary chip shows the negative");
 c.w.document.getElementById("copyBtn").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
 setTimeout(()=>{
   const head=copied.split("\n")[0];

@@ -64,7 +64,6 @@ setTimeout(() => {
      "the supply panel read the refill: " + w.document.getElementById("packHead").textContent);
   ok(w.document.getElementById("supply").querySelectorAll(".doserow").length === 1, "its one date row rendered");
   ok(!/NaN/.test(w.document.getElementById("grid").innerHTML), "no NaN in the month grid");
-  ok(!/NaN/.test(w.document.getElementById("chips").textContent), "nor in the summary chips");
 
   try { fs.unlinkSync(OUT); } catch (e) {}
   console.log(fail ? "\n" + fail + " FAILED" : "\nall passed");

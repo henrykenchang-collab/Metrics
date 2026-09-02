@@ -44,7 +44,6 @@ inp[1].value="200"; inp[1].dispatchEvent(new c.w.Event("input",{bubbles:true}));
 inp[1].dispatchEvent(new c.w.Event("blur",{bubbles:true}));
 ok(store(c).hr===125,"clamping still holds");
 ok(cells[0].querySelector(".gauge > i").style.width==="77%","the gauge still fills");
-ok(/SLP77/.test(c.w.document.getElementById("chips").textContent.replace(/\s/g,"")),"chips unchanged");
 
 console.log("\n-- the times row --");
 ok(c.w.document.getElementById("bed").value==="21:00","bed default intact");

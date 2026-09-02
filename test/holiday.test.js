@@ -135,9 +135,6 @@ const flu=x.w.document.getElementById("grid").querySelector('.sq[data-d="2026-11
 ok(flu.classList.contains("napp")&&flu.textContent==="N/A","an N/A night reads N/A in the grid");
 const sums=[...x.w.document.getElementById("grid").querySelectorAll(".grid-sum")].map(e=>e.textContent);
 ok(!sums.some(t=>/NaN/.test(t)),"and the averages stay clean: "+sums.filter(Boolean).slice(-5).join(" "));
-ok(!/FLU/.test(x.w.document.getElementById("chips").textContent)||
-   !/FLUN\/A/.test(x.w.document.getElementById("chips").textContent.replace(/\s/g,"")),
-   "no empty chip for it");
 
 console.log("\n-- the export --");
 x.w.document.getElementById("copyBtn").dispatchEvent(new x.w.MouseEvent("click",{bubbles:true}));

@@ -49,9 +49,7 @@ console.log("\n-- a day with only Motivation on it still counts as logged --");
 ok(!/NaN/.test(c.w.document.getElementById("grid").innerHTML), "grid clean");
 ok(c.w.document.getElementById("scoreD").textContent !== "", "the readout still renders");
 
-console.log("\n-- the chip and the month grid --");
-ok(/MOT/.test(c.w.document.getElementById("chips").textContent), "a MOT chip appears: " +
-   c.w.document.getElementById("chips").textContent.replace(/\s+/g, " ").trim().slice(0, 80));
+console.log("\n-- the month grid --");
 const labels = [...c.w.document.getElementById("grid").querySelectorAll(".grid-label")].map(e => e.textContent);
 ok(labels.includes("MOT"), "and a MOT row on the month grid: " + labels.join(","));
 ok(labels.indexOf("MOT") === labels.indexOf("MOOD") + 1, "sitting under MOOD there too");

@@ -77,7 +77,6 @@ ok(JSON.parse(c.jar["dailyReadout.v1"])[TODAY].work===5,"productivity uses the s
 
 c=open({"dailyReadout.v1":JSON.stringify({[TODAY]:{ePre:4,_t:1}})});
 ok(segs(c.w,0).filter(b=>b.classList.contains("on")).length===6,"an old 1-5 entry still lands on the scale (4 -> 6 lit)");
-ok(/ENG/.test(c.w.document.getElementById("chips").textContent),"summary chip still renders");
 
 console.log("\n== 3. a missed day is red ==");
 const jar={"dailyReadout.v1":JSON.stringify({

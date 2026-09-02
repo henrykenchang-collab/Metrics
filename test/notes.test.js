@@ -78,8 +78,7 @@ ok(store(c).ePreNote==="back again","without disturbing the others");
 
 console.log("\n-- notes do not leak into the numbers --");
 ok(!/NaN/.test(c.w.document.getElementById("grid").innerHTML),"grid clean");
-const chips=c.w.document.getElementById("chips").textContent;
-ok(!/back again|half day/.test(chips),"notes stay out of the summary chips");
+ok(!/back again|half day/.test(c.w.document.getElementById("grid").innerHTML),"notes stay out of the month grid");
 
 console.log("\n-- reopening the day --");
 c=open({"dailyReadout.v1":JSON.stringify({[TODAY]:{ePre:4,ePreNote:"slept badly",workNote:"travel",_t:1}})});

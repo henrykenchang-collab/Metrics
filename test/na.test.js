@@ -58,10 +58,12 @@ click(c.w,nums(c.w,0)[7]);            // ePre = 5
 click(c.w,na(c.w,1));                 // eAM  = N/A
 click(c.w,nums(c.w,2)[0]);            // ePM  = 1
 ok(store(c).eAM==="na","one point marked N/A");
-const chips=c.w.document.getElementById("chips").textContent;
-ok(/ENG3\.0|ENG.*3/.test(chips.replace(/\s/g,"")),"energy averages 5 and 1 to 3.0, ignoring the N/A: "+chips.replace(/\s+/g," ").trim());
+const engSq=c.w.document.getElementById("grid").querySelector('.sq[data-d="'+TODAY+'"][title^="ENG"]');
+ok(engSq&&/3\.0\/5/.test(engSq.getAttribute("title")),
+   "energy averages 5 and 1 to 3.0, ignoring the N/A: "+(engSq&&engSq.getAttribute("title")));
 click(c.w,na(c.w,4));                 // work = N/A
-ok(!/WRK/.test(c.w.document.getElementById("chips").textContent),'no "na/5" chip for work');
+const wrkSq=c.w.document.getElementById("grid").querySelector('.sq[data-d="'+TODAY+'"][title^="WRK"]');
+ok(wrkSq&&wrkSq.classList.contains("napp"),'work reads not-applicable on the grid, never a stray number');
 
 console.log("\n-- Work Productivity has its own steps --");
 {

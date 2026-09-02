@@ -136,6 +136,5 @@ console.log("\n-- existing dose history still reads --");
 c=open({"dailyReadout.v1":JSON.stringify({[TODAY]:{extraIr:10,extraXr:15,_t:1}})});
 const vals=[...c.w.document.querySelectorAll("#extras .dosein")].map(i=>i.value);
 ok(vals.join(",")==="10,15","10 and 15 come back into the fields");
-ok(/IR10mg/.test(c.w.document.getElementById("chips").textContent.replace(/\s/g,"")),"chips unchanged");
 console.log(fail?"\n"+fail+" FAILED":"\nall passed");
 process.exit(fail?1:0);
