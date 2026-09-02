@@ -137,9 +137,62 @@ const sel=wraps(c.w)[1].querySelector(".mealsel");
 sel.value="Dinner"; sel.dispatchEvent(new c.w.Event("change",{bubbles:true}));
 ok(day(c).meals[1].m==="Dinner","changing the dropdown re-files it");
 
+console.log("\n-- a custom category, added on the fly --");
+const addBtn=(w,i)=>pop(w,i).querySelector(".foodadd");
+const addForm=(w,i)=>pop(w,i).querySelector(".foodaddform");
+const addInput=(w,i)=>pop(w,i).querySelector(".foodaddinput");
+ok(!!addBtn(c.w,0),"a + Add control sits in the picker");
+ok(addForm(c.w,0).hidden===true,"its form starts closed");
+click(c.w,addBtn(c.w,0));
+ok(addForm(c.w,0).hidden===false,"opens on click");
+type(c.w,addInput(c.w,0),"Chicken");
+click(c.w,pop(c.w,0).querySelector(".foodaddsave"));
+ok(JSON.parse(c.jar["dailyReadout.customFoods"]||"[]").indexOf("Chicken")>=0,
+   "the new category joins a synced list, like a custom Factor tag");
+ok(day(c).meals[0].foods.indexOf("Chicken")>=0,"and is checked immediately for the row it was typed in");
+ok(box(c.w,0,"Chicken").checked===true,"the checkbox itself reads checked too");
+ok(pop(c.w,0).hidden===false,"that row's picker reopens rather than just closing on you");
+
+console.log("\n-- it is offered everywhere, not just the row it was typed in --");
+ok(!!box(c.w,1,"Chicken"),"the other, already-open row picked it up too");
+ok(box(c.w,1,"Chicken").checked===false,"unchecked there -- only the row it was added from got it");
+ok([...pop(c.w,0).querySelectorAll(".foodopt span")].map(s=>s.textContent).slice(-2).join(",")==="Chicken,Other (Free Form)",
+   "a custom category lands right before Other, after the built-ins");
+
+console.log("\n-- typing an existing name again does not duplicate it --");
+click(c.w,addBtn(c.w,1));
+type(c.w,addInput(c.w,1),"chicken");                    // different case on purpose
+click(c.w,pop(c.w,1).querySelector(".foodaddsave"));
+ok(JSON.parse(c.jar["dailyReadout.customFoods"]).filter(f=>f==="Chicken").length===1,
+   "case-insensitive match reuses the one already added, rather than adding a near-duplicate");
+ok(day(c).meals[1].foods.indexOf("Chicken")>=0,"and still checks the canonical spelling for this row");
+ok([...pop(c.w,1).querySelectorAll(".foodopt span")].filter(s=>s.textContent==="Chicken").length===1,
+   "only one Chicken pill, not two");
+
+console.log("\n-- it survives a reload, and rides in the seed --");
+{
+  const again=open(c.jar);
+  // Add Meal opens the new row's picker itself; no need to click it open
+  again.w.document.getElementById("mealAdd").dispatchEvent(new again.w.MouseEvent("click",{bubbles:true}));
+  const lastIdx=wraps(again.w).length-1;
+  ok(!!box(again.w,lastIdx,"Chicken"),"Chicken is offered on a fresh load too, from the synced list");
+  const seedHTML='<script type="application/json" id="seed">'+
+    JSON.stringify({v:1,days:{},tags:[],customFoods:["Raw Eggs"],vitInfo:{}})+
+    "</script>"+HTML;
+  const w2=new JSDOM("<!doctype html><html><head><meta charset='utf-8'></head><body>"+seedHTML+"</body></html>",
+    {runScripts:"dangerously",pretendToBeVisual:true,url:"https://a.test/",
+     beforeParse(w){w.HTMLCanvasElement.prototype.getContext=()=>null;
+      const jar={};
+      for(const n of ["localStorage","sessionStorage"])
+       Object.defineProperty(w,n,{value:{getItem:k=>(k in jar?jar[k]:null),
+        setItem:(k,v)=>{jar[k]=String(v);},removeItem:k=>{delete jar[k];}},configurable:true});}}).window;
+  w2.document.getElementById("mealAdd").dispatchEvent(new w2.MouseEvent("click",{bubbles:true}));
+  ok(!!box(w2,0,"Raw Eggs"),"and a category seeded from a published copy is offered too");
+}
+
 console.log("\n-- removing --");
 wraps(c.w)[0].querySelector(".mealdel").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
-ok(day(c).meals.length===1&&day(c).meals[0].foods.join(",")==="Ground Bison","the right row is removed");
+ok(day(c).meals.length===1&&day(c).meals[0].foods.join(",")==="Ground Bison,Chicken","the right row is removed");
 wraps(c.w)[0].querySelector(".mealdel").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
 ok(day(c).meals===undefined,"removing the last one drops the key");
 

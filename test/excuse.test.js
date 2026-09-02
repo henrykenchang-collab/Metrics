@@ -77,21 +77,25 @@ ok(plain.n <= 3, "the plain miss really does stop it: " + plain.n + "d");
 ok(!/Walk with Shanti/.test(r.w.document.getElementById("guard").textContent),
    "no guardrail miss: " + r.w.document.getElementById("guard").textContent.slice(0, 100));
 
-console.log("\n-- layout: the streak sits on the left, the excuse by the checkbox --");
+console.log("\n-- layout: the streak and the excuse both sit right before the checkbox --");
 {
   const x = open({});
   const kids = [...row(x.w, "WLK").children].map(el => el.className);
   const iCode = kids.findIndex(c2 => /\brow-code\b/.test(c2));
-  const iStreak = kids.findIndex(c2 => /\bstreak\b/.test(c2));
   const iName = kids.findIndex(c2 => /\brow-name\b/.test(c2));
   const iExcuse = kids.findIndex(c2 => /\bexcuse\b/.test(c2));
+  const iStreak = kids.findIndex(c2 => /\bstreak\b/.test(c2));
   const iCell = kids.findIndex(c2 => /\bcell\b/.test(c2));
-  ok(iCode < iStreak && iStreak < iName, "code, then streak, then the name: " + kids.join(" | "));
-  ok(iExcuse === iCell - 1, "and the excuse sits directly before the checkbox: " + kids.join(" | "));
-  // a marker with no excuse keeps the same left-to-right code/streak/name/cell shape
+  ok(iCode < iName, "code, then the name: " + kids.join(" | "));
+  ok(iExcuse === iName + 1, "the excuse sits right after the name: " + kids.join(" | "));
+  ok(iStreak === iCell - 1, "and the streak sits directly before the checkbox: " + kids.join(" | "));
+  // a marker with no excuse keeps the same left-to-right code/name/streak/cell shape
   const plain = [...row(x.w, "GYM").children].map(el => el.className);
-  const pStreak = plain.findIndex(c2 => /\bstreak\b/.test(c2)), pName = plain.findIndex(c2 => /\brow-name\b/.test(c2));
-  ok(pStreak < pName, "true of an ordinary row too, not just the one with an excuse: " + plain.join(" | "));
+  const pStreak = plain.findIndex(c2 => /\bstreak\b/.test(c2));
+  const pName = plain.findIndex(c2 => /\brow-name\b/.test(c2));
+  const pCell = plain.findIndex(c2 => /\bcell\b/.test(c2));
+  ok(pName < pStreak && pStreak === pCell - 1,
+     "true of an ordinary row too, not just the one with an excuse: " + plain.join(" | "));
 }
 
 console.log("\n-- Rain is orange, in both states --");
