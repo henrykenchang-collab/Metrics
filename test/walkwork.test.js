@@ -64,8 +64,10 @@ console.log("\n-- a holiday is not a miss anywhere --");
 // the readout's denominator on the holiday must not count it
 const den = labor.w.document.getElementById("scoreD").textContent;
 ok(/\/\d/.test(den), "the readout still counts a denominator: " + den);
-// against another Monday, so the holiday is the only thing that differs
-const plainMon = openOn("2026-08-31").w.document.getElementById("scoreD").textContent;
+// against another Monday, so the holiday is the only thing that differs --
+// a week later, not the week before: Artificial Daylight's own `since` sits
+// between the two, so both sides of the comparison need to land after it
+const plainMon = openOn("2026-09-14").w.document.getElementById("scoreD").textContent;
 const n = t => +t.replace("/", "");
 ok(n(plainMon) === n(den) + 1,
    "a plain Monday asks for one more than Labor Day does: " + plainMon + " vs " + den);

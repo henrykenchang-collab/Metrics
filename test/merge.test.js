@@ -50,7 +50,11 @@ setTimeout(() => {
   ok(d && d.mood === "avg" && d.fluency === "good", "choices intact");
   ok(d && d.extraIr === 10 && d.extraXr === -20, "doses intact, negative included");
   ok(d && d.refill === "2026-01-14", "refill date intact");
-  ok(d && (d.meals || []).length === 2 && d.meals[1].t === "salmon & greens", "meals intact");
+  // a fixture written before the food picker existed migrates on load: the
+  // typed text survives, just filed under Other now instead of raw `t`
+  ok(d && (d.meals || []).length === 2 &&
+     d.meals[1].foods.join(",") === "Other (Free Form)" && d.meals[1].other === "salmon & greens",
+     "meals intact, migrated to the food picker's shape");
   ok(d && (d.tags || []).indexOf("Test Factor") >= 0, "the day's tags intact");
   ok(saved["2026-01-15"] && saved["2026-01-15"].work === "na", "an N/A day keeps its N/A");
 

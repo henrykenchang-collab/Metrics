@@ -91,6 +91,22 @@ ok(tags(c).indexOf("New TH") < 0 && tags(c).indexOf("Fruits") < 0, "retired tags
 ok(tags(c).indexOf("Keeper") >= 0, "an unrelated custom tag survives");
 ok(tags(c).indexOf("Nap") >= 0, "and the built-ins are unaffected");
 
+console.log("\n-- Magnesium (Vit) and Bike (30min), retired --");
+c = open({ "dailyReadout.tags": JSON.stringify(["Magnesium (Vit)", "Bike (30min)", "Keeper"]) });
+ok(tags(c).indexOf("Magnesium (Vit)") < 0 && tags(c).indexOf("Bike (30min)") < 0,
+   "neither is offered for a new entry: " + tags(c).join(","));
+ok(tags(c).indexOf("Keeper") >= 0, "an unrelated custom tag is untouched by it");
+ok(JSON.parse(c.jar["dailyReadout.tags"]).indexOf("Magnesium (Vit)") < 0 &&
+   JSON.parse(c.jar["dailyReadout.tags"]).indexOf("Bike (30min)") < 0,
+   "and both are dropped from the synced picker list, not just hidden");
+c = open({ "dailyReadout.v1": JSON.stringify({
+  "2026-08-30": { vitamins: true, tags: ["Magnesium (Vit)"], _t: 1 },
+  "2026-08-31": { vitamins: true, tags: ["Bike (30min)"], _t: 1 } }) });
+const augThirty = JSON.parse(c.jar["dailyReadout.v1"])["2026-08-30"];
+const augThirtyOne = JSON.parse(c.jar["dailyReadout.v1"])["2026-08-31"];
+ok((augThirty.tags || []).indexOf("Magnesium (Vit)") >= 0, "a past day keeps Magnesium (Vit)");
+ok((augThirtyOne.tags || []).indexOf("Bike (30min)") >= 0, "and a past day keeps Bike (30min)");
+
 console.log("\n-- promoting a custom tag to built-in leaves no duplicate --");
 // "Nap" was a hand-added tag before it became a BASE_TAG; the synced copy
 // is now redundant and should be pruned, without touching any day's tags

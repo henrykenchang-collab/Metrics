@@ -65,60 +65,114 @@ const seg=[...scored.w.document.getElementById("rates").children[4].querySelecto
 seg.dispatchEvent(new scored.w.MouseEvent("click",{bubbles:true}));
 ok(day(scored,back(satBack)).work===5,"but a score you tap overrides it");
 
+const click=(w,el)=>el.dispatchEvent(new w.MouseEvent("click",{bubbles:true}));
+const wraps=w=>[...w.document.querySelectorAll("#meals .mealwrap")];
+const foodBtn=(w,i)=>wraps(w)[i].querySelector(".foodsel");
+const pop=(w,i)=>wraps(w)[i].querySelector(".foodpop");
+const box=(w,i,food)=>[...pop(w,i).querySelectorAll(".foodopt")]
+  .find(l=>l.querySelector("input").value===food).querySelector("input");
+const other=(w,i)=>pop(w,i).querySelector(".mealother");
+const check=(w,i,food)=>click(w,box(w,i,food));
+
 console.log("\n-- Meals --");
 c=open({});
 ok(!!c.w.document.getElementById("meals"),"the section exists");
 ok(c.w.document.getElementById("meals").children.length===0,"empty to begin with");
 ok(!!c.w.document.getElementById("mealAdd"),"with an Add Meal button");
 c.w.document.getElementById("mealAdd").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
-let row=c.w.document.getElementById("meals").children[0];
+let row=wraps(c.w)[0];
 ok(!!row,"adding gives a row");
 ok([...row.querySelectorAll("option")].map(o=>o.value).join(",")==="Breakfast,Lunch,Dinner","the dropdown offers the three meals");
 ok(row.querySelector(".mealsel").value==="Breakfast","first row defaults to Breakfast");
-ok(!!row.querySelector(".mealtext"),"with a free-form field beside it");
+ok(!!row.querySelector(".foodsel"),"with a food picker beside it, not a free-form field");
+ok(!c.w.document.querySelector(".mealtext"),"the old free-form field is gone");
 ok(Object.keys(JSON.parse(c.jar["dailyReadout.v1"]||"{}")).length===0,
    "an empty row does not conjure a day into existence");
 
-type(c.w,row.querySelector(".mealtext"),"eggs, avocado, black coffee");
-ok(day(c).meals[0].t==="eggs, avocado, black coffee","typing records it");
-ok(day(c).meals[0].m==="Breakfast","against the chosen meal");
+console.log("\n-- the picker itself --");
+// Add Meal opens the new row's picker right away, same spirit as the old
+// version focusing the text field -- so this checks the state adding leaves
+// it in, not a bare "closed by default"
+ok(pop(c.w,0).hidden===false,"adding a meal opens its picker, ready to use");
+ok(foodBtn(c.w,0).getAttribute("aria-expanded")==="true","and the button says so");
+ok([...pop(c.w,0).querySelectorAll(".foodopt span")].map(s=>s.textContent).join(",")===
+   "Steak,Ground Beef,Ground Bison,Avocado,Fried Eggs,Fruits,Other (Free Form)",
+   "offers the seven options, Other last");
+ok(other(c.w,0).hidden===true,"the free-form field stays hidden until Other is picked");
+click(c.w,foodBtn(c.w,0));
+ok(pop(c.w,0).hidden===true,"the same button closes it again");
+ok(foodBtn(c.w,0).getAttribute("aria-expanded")==="false","and says so");
+click(c.w,foodBtn(c.w,0));
+ok(pop(c.w,0).hidden===false,"and opens it right back up");
 
+console.log("\n-- picking more than one --");
+check(c.w,0,"Steak");
+ok(day(c).meals[0].foods.join(",")==="Steak","checking Steak records it");
+ok(foodBtn(c.w,0).textContent==="Steak","and shows on the button");
+check(c.w,0,"Avocado");
+ok(day(c).meals[0].foods.join(",")==="Steak,Avocado","a second pick adds, not replaces");
+ok(foodBtn(c.w,0).textContent==="Steak, Avocado","both read on the button");
+check(c.w,0,"Steak");
+ok(day(c).meals[0].foods.join(",")==="Avocado","unchecking drops just that one");
+ok(day(c).meals[0].m==="Breakfast","all the while against the chosen meal");
+
+console.log("\n-- Other reveals a field of its own --");
+check(c.w,0,"Other (Free Form)");
+ok(other(c.w,0).hidden===false,"checking Other opens the free-form field");
+type(c.w,other(c.w,0),"black coffee");
+ok(day(c).meals[0].other==="black coffee","typed text is kept separately");
+ok(foodBtn(c.w,0).textContent==="Avocado, black coffee","and reads on the button in Other's place");
+check(c.w,0,"Other (Free Form)");
+ok(other(c.w,0).hidden===true,"unchecking Other hides the field again");
+ok(day(c).meals[0].foods.indexOf("Other (Free Form)")===-1,"and drops it from the picked list");
+ok(day(c).meals[0].other==="black coffee","though the typed text itself is left alone, just unused");
+
+console.log("\n-- a second meal --");
 c.w.document.getElementById("mealAdd").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
-let row2=c.w.document.getElementById("meals").children[1];
-ok(row2.querySelector(".mealsel").value==="Lunch","the second row offers Lunch next");
-type(c.w,row2.querySelector(".mealtext"),"chicken salad");
-ok(day(c).meals.length===2&&day(c).meals[1].t==="chicken salad","two meals held independently");
+ok(wraps(c.w)[1].querySelector(".mealsel").value==="Lunch","the second row offers Lunch next");
+check(c.w,1,"Ground Bison");
+ok(day(c).meals.length===2&&day(c).meals[1].foods.join(",")==="Ground Bison","two meals held independently");
 
-const sel=row2.querySelector(".mealsel");
+const sel=wraps(c.w)[1].querySelector(".mealsel");
 sel.value="Dinner"; sel.dispatchEvent(new c.w.Event("change",{bubbles:true}));
 ok(day(c).meals[1].m==="Dinner","changing the dropdown re-files it");
 
 console.log("\n-- removing --");
-c.w.document.getElementById("meals").children[0].querySelector(".mealdel")
-  .dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
-ok(day(c).meals.length===1&&day(c).meals[0].t==="chicken salad","the right row is removed");
-c.w.document.getElementById("meals").children[0].querySelector(".mealdel")
-  .dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
+wraps(c.w)[0].querySelector(".mealdel").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
+ok(day(c).meals.length===1&&day(c).meals[0].foods.join(",")==="Ground Bison","the right row is removed");
+wraps(c.w)[0].querySelector(".mealdel").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
 ok(day(c).meals===undefined,"removing the last one drops the key");
 
-console.log("\n-- text is text, not markup --");
+console.log("\n-- Other's text is text, not markup --");
 c=open({});
 c.w.document.getElementById("mealAdd").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
-type(c.w,c.w.document.querySelector(".mealtext"),'<img src=x onerror=alert(1)> & "quotes"');
-ok(day(c).meals[0].t.indexOf("<img")===0,"stored verbatim");
+check(c.w,0,"Other (Free Form)");
+type(c.w,other(c.w,0),'<img src=x onerror=alert(1)> & "quotes"');
+ok(day(c).meals[0].other.indexOf("<img")===0,"stored verbatim");
 ok(c.w.document.querySelectorAll("#meals img").length===0,"and never becomes an element");
 
 console.log("\n-- it reopens with the day --");
-c=open({"dailyReadout.v1":JSON.stringify({[TODAY]:{meals:[{m:"Dinner",t:"steak"}],vitamins:true,_t:1}})});
+c=open({"dailyReadout.v1":JSON.stringify({[TODAY]:{meals:[{m:"Dinner",foods:["Steak","Other (Free Form)"],other:"and a baked potato"}],vitamins:true,_t:1}})});
 ok(c.w.document.querySelectorAll("#meals .mealrow").length===1,"the row comes back");
-ok(c.w.document.querySelector(".mealtext").value==="steak","with its text");
-ok(c.w.document.querySelector(".mealsel").value==="Dinner","and its meal");
+ok(pop(c.w,0).hidden===true,"its picker starts closed, unlike a freshly added row");
+ok(foodBtn(c.w,0).textContent==="Steak, and a baked potato","with its foods and Other text");
+ok(wraps(c.w)[0].querySelector(".mealsel").value==="Dinner","and its meal");
+click(c.w,foodBtn(c.w,0));
+ok(other(c.w,0).hidden===false,"opening it shows Other's field, since it was picked");
+ok(other(c.w,0).value==="and a baked potato","carrying the saved text");
+
+console.log("\n-- a meal typed before the picker existed still reads, through Other --");
+c=open({"dailyReadout.v1":JSON.stringify({[TODAY]:{meals:[{m:"Lunch",t:"chicken salad"}],vitamins:true,_t:1}})});
+ok(day(c).meals[0].t===undefined,"migrated away on load");
+ok(day(c).meals[0].foods.join(",")==="Other (Free Form)","filed under Other");
+ok(day(c).meals[0].other==="chicken salad","carrying the original text verbatim");
+ok(foodBtn(c.w,0).textContent==="chicken salad","and it still just reads as itself on the button");
 
 console.log("\n-- the export --");
 c.w.document.getElementById("copyBtn").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
 setTimeout(()=>{
   ok(/Meals/.test(copied.split("\n")[0]),"a Meals column");
-  ok(/Dinner: steak/.test(copied),"holding meal and text: ");
+  ok(/Lunch: chicken salad/.test(copied),"holding meal and text: ");
   console.log(fail?"\n"+fail+" FAILED":"\nall passed");
   process.exit(fail?1:0);
 },150);

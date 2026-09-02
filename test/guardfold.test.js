@@ -79,5 +79,40 @@ console.log("\n-- the panels are untouched by it --");
 const shutList = JSON.parse(back.jar["dailyReadout.shut"]);
 ok(shutList.indexOf("guard") >= 0 && shutList.indexOf("vitaminSupply") >= 0,
    "guard and vitaminSupply share the one store: " + shutList.join(", "));
+
+console.log("\n-- Sauna is not yet a settled habit, so a miss stays quiet --");
+{
+  // pinned well after Sauna's own `since` (2026-08-17), so 30 days of
+  // history land entirely inside its window rather than before it existed --
+  // and on a day Sauna is actually due (Sun/Mon/Tue), so its own row still
+  // shows a streak rather than reading Not Due
+  const NOW = "2026-10-05T12:00:00";
+  function openPinned(jar) { jar = jar || {};
+    const w = new JSDOM("<!doctype html><html><head><meta charset='utf-8'></head><body>" + HTML + "</body></html>",
+     { runScripts: "dangerously", pretendToBeVisual: true, url: "https://a.test/",
+       beforeParse(w) { w.HTMLCanvasElement.prototype.getContext = () => null;
+        const R = w.Date;
+        function F(...a) { return a.length ? new R(...a) : new R(NOW); }
+        F.prototype = R.prototype; F.now = () => new R(NOW).getTime(); F.parse = R.parse; F.UTC = R.UTC; w.Date = F;
+        for (const [n, st] of [["localStorage", jar], ["sessionStorage", {}]])
+         Object.defineProperty(w, n, { value: { getItem: k => (k in st ? st[k] : null),
+          setItem: (k, v) => { st[k] = String(v); }, removeItem: k => { delete st[k]; } }, configurable: true }); } }).window;
+    return { w, jar };
+  }
+  const today = "2026-10-05";
+  // every day logged (via vitamins), Sauna and Greens both due repeatedly
+  // and never done -- the same shape of lapse for each, on purpose
+  const seed = {};
+  for (let i = 0; i < 30; i++) seed[shift(today, -i)] = { vitamins: true, ePre: 4, _t: 1 };
+  const g = openPinned({ "dailyReadout.v1": JSON.stringify(seed) });
+  const text = guard(g.w).textContent;
+  ok(!/Sauna/.test(text), "Sauna's own lapse never appears in Guardrails: " + text.slice(0, 160));
+  ok(/Lapsed/.test(text), "while an equally lapsed marker without the flag still trips it");
+  const sauRow = [...g.w.document.getElementById("rows").querySelectorAll(".row")]
+    .find(b => b.querySelector(".row-code").textContent === "SAU");
+  ok(/^\D+\d+d$/.test(sauRow.querySelector(".streak").textContent),
+     "though the row itself still shows the miss, just not in Guardrails: " + sauRow.querySelector(".streak").textContent);
+}
+
 console.log(fail ? "\n" + fail + " FAILED" : "\nall passed");
 process.exit(fail ? 1 : 0);

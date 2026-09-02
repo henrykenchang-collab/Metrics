@@ -498,29 +498,49 @@
   .row:active .cell { transform: scale(.86); }
 
   /* ---------------- meals ---------------- */
+  .mealwrap { border-bottom: 1px solid var(--line); }
+  .mealwrap:last-child { border-bottom: 0; }
   .mealrow {
     display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px;
-    padding: 9px 16px; border-bottom: 1px solid var(--line);
+    padding: 9px 16px;
   }
-  .mealrow:last-child { border-bottom: 0; }
   .mealsel {
     font: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink-2);
     background: var(--surface-2); border: 1px solid transparent; border-radius: 8px;
     padding: 6px 8px; -webkit-appearance: none; appearance: none;
   }
   .mealsel:focus { border-color: var(--accent); }
-  .mealtext {
+  /* the food picker's own trigger -- looks like the old free-text field, but
+     it is a button: click it and the checklist below drops open */
+  .foodsel {
     width: 100%; min-width: 0; font: inherit; font-size: 14px; padding: 6px 0;
-    color: var(--ink); background: none; border: 0;
+    color: var(--ink); background: none; border: 0; text-align: left; cursor: pointer;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     -webkit-appearance: none; appearance: none;
   }
-  .mealtext::placeholder { color: var(--ink-3); }
+  .foodsel.empty { color: var(--ink-3); }
+  .foodsel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
   .mealdel {
     width: 26px; height: 26px; flex: none; border-radius: 7px;
     color: var(--ink-3); background: var(--surface-2);
     display: grid; place-items: center; font-size: 15px; line-height: 1;
   }
   .mealdel:active { transform: scale(.9); }
+  .foodpop { padding: 0 16px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .foodpop[hidden] { display: none; }
+  .foodopt {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-2);
+    background: var(--surface-2); border-radius: 999px; padding: 4px 10px 4px 8px; cursor: pointer;
+  }
+  .foodopt input { margin: 0; accent-color: var(--accent); }
+  .mealother {
+    flex: 1 1 100%; font: inherit; font-size: 13px; padding: 6px 9px; margin-top: 2px;
+    color: var(--ink); background: var(--surface-2); border: 1px solid transparent; border-radius: 8px;
+    -webkit-appearance: none; appearance: none;
+  }
+  .mealother[hidden] { display: none; }
+  .mealother::placeholder { color: var(--ink-3); }
+  .mealother:focus { border-color: var(--accent); }
   .mealadd { padding: 11px 16px 14px; border-top: 1px solid var(--line); }
   #meals:empty + .mealadd { border-top: 0; }
 
@@ -835,8 +855,12 @@
     { key: "vitamins", code: "VIT", name: "Vitamins" },
     /* only recently made part of the routine, so a lapse before this Monday
        is not a real miss — `since` keeps it out of the streak entirely,
-       the same way an off-schedule weekday already is */
-    { key: "sauna",    code: "SAU", name: "Sauna",       days: [0, 1, 2], since: "2026-08-17" },
+       the same way an off-schedule weekday already is.
+       `noGuard` is separate and temporary: Sauna is not yet a settled habit,
+       so a miss should not trip Guardrails or count toward a trend either,
+       until asked to turn it back on — remove the flag to resume. */
+    { key: "sauna",    code: "SAU", name: "Sauna",       days: [0, 1, 2], since: "2026-08-17",
+      noGuard: true },
     { key: "greens",   code: "GRN", name: "Greens",      days: [0, 1, 3] },
     { key: "keto",     code: "KET", name: "Keto" },
     { key: "plunge",   code: "CLD", name: "Cold Plunge", days: [0, 1, 2, 3, 4, 5] },
@@ -852,6 +876,10 @@
     { key: "read",     code: "RDG", name: "Read", sub: "15 Min",
       days: [0, 1, 2, 3, 4, 5],
       subDays: { 0: "30 Min" }, label: "Read (15/30 Min)" },
+    /* brand new today -- `since` keeps every day before this one from
+       reading as a lapse, the same as Walk (Work) and the brushes. */
+    { key: "artLight", code: "LGT", name: "Artificial Daylight", sub: "30 Min",
+      since: "2026-09-02", label: "Artificial Daylight (30min)" },
     /* things to do LESS of: a streak is unbroken while you leave it alone,
        and breaks the day you tap it */
     { key: "th",       code: "TH",  name: "TH",  invert: true },
@@ -1007,6 +1035,8 @@
   function fluNum(v) { return FLU_N.hasOwnProperty(v) ? FLU_N[v] : null; }
 
   var MEALS = ["Breakfast", "Lunch", "Dinner"];
+  var FOOD_OTHER = "Other (Free Form)";
+  var FOODS = ["Steak", "Ground Beef", "Ground Bison", "Avocado", "Fried Eggs", "Fruits", FOOD_OTHER];
 
   /* Built in, so they are on every device and can never be retired by the
      orphan rule below — unlike a tag added through "+ New Factor", which
@@ -1021,7 +1051,7 @@
      the label in storage and in the CSV — nothing written is deleted. */
   var RETIRED_TAGS = ["New Supplement", "Late Meal", "Alcohol", "Travel",
                       "Sore / Injury", "Big Carbs", "Skipped Meal", "Late Screens",
-                      "New TH", "Fruits"];
+                      "New TH", "Fruits", "Magnesium (Vit)", "Bike (30min)"];
 
   /* Renamed rather than retired, so past days keep the association. */
   var RENAMED_TAGS = {
@@ -1386,6 +1416,22 @@
       });
       if (out.join(" ") !== d.tags.join(" ")) { d.tags = out; migrated = true; }
     }
+
+    /* meals (v1): free text -> a pick of FOODS plus an optional Other note.
+       A meal typed before the picker existed cannot be guessed into the new
+       categories, so the whole of it becomes the Other note instead --
+       nothing written is lost, it just now reads through Other. */
+    if (d.meals && d.meals.length) {
+      d.meals.forEach(function (entry) {
+        if (entry && entry.t !== undefined) {
+          if (!entry.foods) entry.foods = [];
+          if (entry.t.trim() && entry.foods.indexOf(FOOD_OTHER) < 0) entry.foods.push(FOOD_OTHER);
+          if (entry.t.trim()) entry.other = entry.other ? entry.other + " " + entry.t : entry.t;
+          delete entry.t;
+          migrated = true;
+        }
+      });
+    }
   });
   if (migrated) save();
   if (tagsDirty) saveTags();
@@ -1723,10 +1769,14 @@
   }
 
   /* --- meals ---
-     Built from the DOM rather than a string, so what you type is never parsed
-     as markup, and rebuilt only on add, remove or a change of meal — typing
-     writes straight through, the way the rating notes do. */
+     Built from the DOM rather than a string, so what's typed in the Other
+     field is never parsed as markup, and rebuilt only on add, remove or a
+     change of meal — a checkbox or the Other field writes straight through,
+     the way the rating notes do, no rebuild needed. */
   function mealRow(entry, i) {
+    var wrap = document.createElement("div");
+    wrap.className = "mealwrap";
+
     var row = document.createElement("div");
     row.className = "mealrow";
 
@@ -1744,16 +1794,11 @@
       if (list && list[i]) { list[i].m = sel.value; save(cur); }
     });
 
-    var txt = document.createElement("input");
-    txt.className = "mealtext"; txt.type = "text"; txt.maxLength = 160;
-    txt.placeholder = "What you ate";
-    txt.value = entry.t || "";
-    txt.setAttribute("aria-label", (entry.m || "Meal") + ": what you ate");
-    txt.addEventListener("input", function () {
-      var d = day(cur);
-      d.meals = d.meals || [];
-      if (d.meals[i]) { d.meals[i].t = txt.value; save(cur); }
-    });
+    var foodBtn = document.createElement("button");
+    foodBtn.className = "foodsel"; foodBtn.type = "button";
+    foodBtn.setAttribute("aria-haspopup", "true");
+    foodBtn.setAttribute("aria-expanded", "false");
+    foodBtn.setAttribute("aria-label", (entry.m || "Meal") + ": what you ate");
 
     var del = document.createElement("button");
     del.className = "mealdel"; del.type = "button"; del.textContent = "\u00d7";
@@ -1766,8 +1811,60 @@
       save(cur); render(); renderMeals(true);
     });
 
-    row.appendChild(sel); row.appendChild(txt); row.appendChild(del);
-    return row;
+    row.appendChild(sel); row.appendChild(foodBtn); row.appendChild(del);
+
+    var pop = document.createElement("div");
+    pop.className = "foodpop"; pop.hidden = true;
+    function paintBtn() {
+      var t = mealText(entry);
+      foodBtn.textContent = t || "What you ate";
+      foodBtn.classList.toggle("empty", !t);
+    }
+    var otherInput = document.createElement("input");
+    otherInput.className = "mealother"; otherInput.type = "text"; otherInput.maxLength = 160;
+    otherInput.placeholder = "Describe it";
+    otherInput.value = entry.other || "";
+    otherInput.hidden = (entry.foods || []).indexOf(FOOD_OTHER) < 0;
+    otherInput.setAttribute("aria-label", (entry.m || "Meal") + ": Other, describe it");
+    otherInput.addEventListener("input", function () {
+      entry.other = otherInput.value;
+      var d = day(cur);
+      d.meals = d.meals || [];
+      if (d.meals[i]) { d.meals[i].other = otherInput.value; save(cur); }
+      paintBtn();
+    });
+    FOODS.forEach(function (f) {
+      var label = document.createElement("label");
+      label.className = "foodopt";
+      var box = document.createElement("input");
+      box.type = "checkbox"; box.value = f;
+      box.checked = (entry.foods || []).indexOf(f) >= 0;
+      box.addEventListener("change", function () {
+        entry.foods = entry.foods || [];
+        var idx = entry.foods.indexOf(f);
+        if (box.checked && idx < 0) entry.foods.push(f);
+        else if (!box.checked && idx >= 0) entry.foods.splice(idx, 1);
+        if (f === FOOD_OTHER) { otherInput.hidden = !box.checked; if (box.checked) otherInput.focus(); }
+        var d = day(cur);
+        d.meals = d.meals || [];
+        if (d.meals[i]) { d.meals[i].foods = entry.foods.slice(); save(cur); }
+        paintBtn();
+      });
+      var span = document.createElement("span"); span.textContent = f;
+      label.appendChild(box); label.appendChild(span);
+      pop.appendChild(label);
+    });
+    pop.appendChild(otherInput);
+    paintBtn();
+
+    foodBtn.addEventListener("click", function () {
+      var open = pop.hidden;
+      pop.hidden = !open;
+      foodBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+
+    wrap.appendChild(row); wrap.appendChild(pop);
+    return wrap;
   }
 
   /* `force` is for add and remove, which are deliberate: without it the focus
@@ -1787,10 +1884,10 @@
     d.meals = d.meals || [];
     // deliberately unsaved: an empty row is not yet a meal, and saving one
     // would either create a day out of nothing or be swept away as empty
-    d.meals.push({ m: MEALS[Math.min(d.meals.length, MEALS.length - 1)], t: "" });
+    d.meals.push({ m: MEALS[Math.min(d.meals.length, MEALS.length - 1)], foods: [] });
     renderMeals(true);
     var last = $("meals").lastChild;
-    if (last) last.querySelector(".mealtext").focus();
+    if (last) last.querySelector(".foodsel").click();
   });
 
   /* --- tags --- */
@@ -1920,11 +2017,23 @@
     return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null;
   }
   function mean(a) { return a.reduce(function (x, y) { return x + y; }, 0) / a.length; }
+  /* What a meal entry reads as: the foods picked, Other (Free Form) swapped
+     for whatever was typed beside it -- or just "Other" if that was left
+     blank. Used for the picker button, the export, and hasMeals below. */
+  function mealText(entry) {
+    if (!entry) return "";
+    var foods = (entry.foods || []).filter(function (f) { return f !== FOOD_OTHER; });
+    if ((entry.foods || []).indexOf(FOOD_OTHER) >= 0) {
+      var o = (entry.other || "").trim();
+      foods.push(o || "Other");
+    }
+    return foods.join(", ");
+  }
   /* Content a person actually put there. An assumed bed/wake is not content:
      without this, undoing the one marker that summoned it would leave the day
      behind as a night's sleep nobody ever entered. */
   function hasMeals(d) {
-    return !!(d && d.meals && d.meals.some(function (x) { return x && x.t && x.t.trim(); }));
+    return !!(d && d.meals && d.meals.some(function (x) { return mealText(x).trim(); }));
   }
 
   function entered(d) {
@@ -2164,6 +2273,7 @@
        would drown the trend flags, which are the rarer signal. */
     var misses = [];
     MARKERS.forEach(function (m) {
+      if (m.noGuard) return;     // not yet a settled habit -- see the marker's own comment
       var n = missStreak(m);
       if (n > MISS_LIMIT) misses.push({ name: markerLabel(m), n: n });
     });
@@ -2964,8 +3074,8 @@
         .concat([d.work === NA ? "N/A" : (d.work || "")])
         .concat(RATINGS.map(function (r) { return d[noteKey(r)] || ""; }))
         .concat(CHOICE_ROWS.map(function (c) { return choiceLabel(d[c.key]); }))
-        .concat([(d.meals || []).filter(function (x) { return x && x.t && x.t.trim(); })
-                   .map(function (x) { return x.m + ": " + x.t; }).join("; "),
+        .concat([(d.meals || []).filter(function (x) { return x && mealText(x).trim(); })
+                   .map(function (x) { return x.m + ": " + mealText(x); }).join("; "),
                  d.changed || "", (d.tags || []).join("; ")])
         .map(q).join(","));
     });

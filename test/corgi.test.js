@@ -80,7 +80,7 @@ setTimeout(()=>{
      "carries whiskers -- thin strokes Shanti's corgi mark has none of");
 
   console.log("\n-- the tracker still works --");
-  ok(w.document.querySelectorAll("#rows > .row, #petrows > .row").length===14,"14 markers still render");
+  ok(w.document.querySelectorAll("#rows > .row, #petrows > .row").length===15,"15 markers still render");
   const sub=c=>[...w.document.getElementById("rows").querySelectorAll(".row")]
     .find(b=>b.querySelector(".row-code").textContent===c).querySelector(".row-sub").textContent.trim().replace(/^:\s*/,"");
   ok(sub("GRN")==="Sun · Mon · Wed","greens schedule intact");

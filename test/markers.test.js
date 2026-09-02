@@ -38,7 +38,7 @@ console.log("\n-- Gym --");
 let c=open({});
 ok(!!rowFor(c.w,"GYM"),"a GYM row exists");
 ok(title(c.w,"GYM")==="Gym: Sun · Mon · Thu · Fri","reads: "+JSON.stringify(title(c.w,"GYM")));
-ok(c.w.document.querySelectorAll("#rows > .row, #petrows > .row").length===14,"fourteen markers now, across two panels");
+ok(c.w.document.querySelectorAll("#rows > .row, #petrows > .row").length===15,"fifteen markers now, across two panels");
 ok(c.w.document.getElementById("petrows").children.length===3,"three of them in Shanti and Buddha");
 rowFor(c.w,"GYM").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
 ok(store(c).gym===true,"it records");
@@ -56,6 +56,18 @@ ok(title(c.w,"WLK")==="Walk with Shanti: PM · Not Sat","target and schedule com
 ok(/^Read: 15 Min · Not Sat$|^Read: 30 Min · Not Sat$/.test(title(c.w,"RDG")),
    "Read carries its target too: "+title(c.w,"RDG"));
 ok(rowFor(c.w,"SAU").querySelectorAll(".row-name > *").length===1,"one line, one nested span");
+
+console.log("\n-- Artificial Daylight --");
+ok(!!rowFor(c.w,"LGT"),"an LGT row exists");
+ok(title(c.w,"LGT")==="Artificial Daylight: 30 Min","reads: "+JSON.stringify(title(c.w,"LGT")));
+rowFor(c.w,"LGT").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
+ok(store(c).artLight===true,"it records");
+const lgtLabels=[...c.w.document.getElementById("grid").querySelectorAll(".grid-label")].map(e=>e.textContent);
+ok(lgtLabels.includes("LGT"),"and has its own row in the month grid");
+// brand new today -- `since` must keep any earlier lapse from reading as one
+const early=open({"dailyReadout.v1":JSON.stringify({"2026-06-01":{vitamins:true,_t:1}})});
+ok(!/Artificial Daylight/.test(early.w.document.getElementById("guard").textContent),
+   "no retroactive lapse from before it existed");
 
 console.log("\n-- Shanti and Buddha --");
 c=open({});
