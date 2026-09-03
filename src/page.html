@@ -457,6 +457,9 @@
   .numin.band-bad  { color: var(--neg); }
   .numin:focus { outline-offset: 4px; }
   .stat-unit { font-family: var(--mono); font-size: 9.5px; color: var(--ink-3); }
+  /* Deep/REM/Light only -- their share of the night, alongside the raw figure */
+  .stat-pct { font-family: var(--mono); font-size: 9.5px; color: var(--ink-3); }
+  .stat-pct:empty { display: none; }
   .gauge { height: 3px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
   .gauge > i { display: block; height: 100%; width: 0; background: var(--violet); border-radius: 2px; transition: width .3s cubic-bezier(.2,.7,.3,1); }
 
@@ -1014,6 +1017,13 @@
     { key: "th",       code: "TH",  name: "TH",  invert: true },
     { key: "yt",       code: "YT",  name: "YT",  invert: true },
 
+    /* A record of the day, not a habit -- a running streak of vacation days,
+       or a Guardrails alert for going too long without one, would both be
+       nonsensical, so `noStreak` drops the streak pill and the start-date
+       field entirely (there is nothing here for a start date to gate), on
+       top of the `noGuard` every settled-in marker already has. */
+    { key: "pto",      code: "PTO", name: "PTO", noGuard: true, noStreak: true },
+
     /* `group` names the panel body a marker renders into; without one it
        goes to Daily Markers. Only the rendering splits — streaks, the
        readout's due count, the guardrails and the export all walk MARKERS
@@ -1059,12 +1069,12 @@
      that wraps costs every cell a second line — and "Heart Rate Variability"
      wrapped. `label` still goes to the export and the screen reader. */
   var STATS = [
-    /* band(v) colors the number itself green/yellow/red. Only these three
-       carry one -- CPAP already has its own red-for-zero treatment in the
-       month grid, and nothing else here has a stated target range yet.
+    /* band(v) colors the number itself green/yellow/red. Only these four
+       carry one -- nothing else here has a stated target range yet.
        Rest HR's own bands leave 65 exactly between "61-64" and "greater
        than 65" as given; closed here on the red side, matching how the
-       other two are written as closed, adjoining ranges. */
+       other two are written as closed, adjoining ranges. CPAP has no
+       stated warn band, just good at 85 and up, red under it. */
     { key: "sleep", label: "Sleep Score",            short: "Sleep",   min: 0,  max: 100, unit: "/100",
       band: function (v) { return v >= 70 ? "good" : v >= 65 ? "warn" : "bad"; } },
     { key: "hr",    label: "Heart Rate",             short: "Rest HR", min: 35, max: 125, unit: "bpm",
@@ -1072,20 +1082,21 @@
     { key: "hrv",   label: "Heart Rate Variability", short: "HRV",     min: 0,  max: 100, unit: "ms",
       band: function (v) { return v >= 40 ? "good" : v >= 35 ? "warn" : "bad"; } },
     { key: "cpap",  label: "CPAP Score",             short: "CPAP",    min: 0,  max: 100, unit: "/100",
-      /* only the bad end is stated, so only the bad end is coloured: no
-         green claim for a "good" CPAP score that was never defined */
-      band: function (v) { return v < 80 ? "bad" : null; } }
+      band: function (v) { return v >= 85 ? "good" : "bad"; } }
   ];
 
   /* From the Oura export, not the API pull: the ring reports both an average
      and a lowest resting heart rate, and `hr` above already means the lower
      one -- avgHr is the other half, not a duplicate. Deep/REM/Light are
-     sleep-stage minutes, the three of which sum to roughly the night's total. */
+     sleep-stage durations, the three of which sum to roughly the night's
+     total -- Deep and REM stay in minutes, Light reads in hours instead.
+     `pctOfBed` shows each as a share of the night's time in bed, alongside
+     the raw figure, so "33 min" also reads as "8% of the night". */
   var STATS2 = [
     { key: "avgHr",      label: "Average Resting Heart Rate", short: "Avg HR", min: 35, max: 125, unit: "bpm" },
-    { key: "deepSleep",  label: "Deep Sleep",                 short: "Deep",   min: 0,  max: 300, unit: "min" },
-    { key: "remSleep",   label: "REM Sleep",                  short: "REM",    min: 0,  max: 300, unit: "min" },
-    { key: "lightSleep", label: "Light Sleep",                short: "Light",  min: 0,  max: 600, unit: "min" }
+    { key: "deepSleep",  label: "Deep Sleep",                 short: "Deep",   min: 0,  max: 300, unit: "min", pctOfBed: true },
+    { key: "remSleep",   label: "REM Sleep",                  short: "REM",    min: 0,  max: 300, unit: "min", pctOfBed: true },
+    { key: "lightSleep", label: "Light Sleep",                short: "Light",  min: 0,  max: 10,  unit: "h", len: 4, decimal: true, pctOfBed: true, toMinutes: function (v) { return v * 60; } }
   ];
 
   /* Quantified intakes — same family as the markers (things you take),
@@ -1197,7 +1208,7 @@
     { v: "avgHr",       label: "Avg HR",     dp: 0, unit: "bpm" },
     { v: "deepSleep",   label: "Deep Sleep", dp: 0, unit: "min" },
     { v: "remSleep",    label: "REM Sleep",  dp: 0, unit: "min" },
-    { v: "lightSleep",  label: "Light Sleep",dp: 0, unit: "min" }
+    { v: "lightSleep",  label: "Light Sleep",dp: 1, unit: "h" }
   ];
   var TIMINGS = [{ v: 0, label: "Same Day" }, { v: 1, label: "Next Day" }];
 
@@ -1233,7 +1244,7 @@
        lighter and less restorative (not). Coded as a fall being the flag, on
        the same logic as the others: a shift is worth a look either way, and
        this is the direction more often reported as the concerning one. */
-    { label: "Light Sleep",            dp: 0, unit: " min", move: 30,  good: "down",
+    { label: "Light Sleep",            dp: 1, unit: " h",   move: 0.5, good: "down",
       get: function (d) { return d.lightSleep === undefined ? null : d.lightSleep; } },
     /* Doses read as average mg per logged day, so a rise catches taking the
        same amount more often as well as taking more at a time. Days with none
@@ -1598,7 +1609,12 @@
      2. Tag labels were re-cased to Title Case; stored tags are matched
         case-insensitively and rewritten so older days stay selected.
         Anything unrecognised becomes a custom tag rather than being
-        left orphaned and untoggleable. */
+        left orphaned and untoggleable.
+     3. Light Sleep moved from minutes to hours. A value-based heuristic
+        rather than a run-once flag: a real night's light sleep in minutes
+        is always well over 24, and never will be once it's really hours,
+        so the conversion is naturally idempotent -- safe to leave running
+        on every boot rather than needing its own "done" marker. */
   var migrated = false, tagsDirty = false;
 
   /* Labels that have no business in customTags. A retired one must not
@@ -1626,6 +1642,11 @@
     if (carry.length) {
       if (d.changed) carry.push(d.changed);
       d.changed = carry.join("\n");
+      migrated = true;
+    }
+
+    if (typeof d.lightSleep === "number" && d.lightSleep > 24) {
+      d.lightSleep = Math.round(d.lightSleep / 60 * 10) / 10;
       migrated = true;
     }
 
@@ -1669,7 +1690,7 @@
   function backfillMarkerStart() {
     var loggedDays = null, earliestAny, changed = false;
     MARKERS.forEach(function (m) {
-      if (m.since || markerStart[m.key]) return;
+      if (m.since || m.noStreak || markerStart[m.key]) return;   // noStreak markers have no start date to gate
       if (!loggedDays) { loggedDays = Object.keys(data).sort(); earliestAny = loggedDays[0] || null; }
       var earliest = null;
       loggedDays.some(function (k) {
@@ -1762,10 +1783,13 @@
           'aria-label="' + s.label + ' (' + s.min + ' to ' + s.max + ')">' +
         (s.unit ? '<span class="dose-unit">' + s.unit + '</span>' : "")
       : '<span class="code stat-label">' + (s.short || s.label) + '</span>' +
-        '<span class="stat-in"><input class="numin" type="text" inputmode="numeric" placeholder="––" maxlength="3" ' +
+        '<span class="stat-in"><input class="numin" type="text" inputmode="' + (s.decimal ? "decimal" : "numeric") +
+          '" placeholder="––" maxlength="' + (s.len || 3) + '" ' +
           'aria-label="' + s.label + ' (' + s.min + ' to ' + s.max + ')"><span class="stat-unit">' + s.unit + '</span></span>' +
+        (s.pctOfBed ? '<span class="stat-pct"></span>' : '') +
         '<span class="gauge"><i></i></span>';
     var input = wrap.querySelector("input"), fill = wrap.querySelector(".gauge > i");
+    var pct = wrap.querySelector(".stat-pct");
 
     input.addEventListener("focus", function () { input.select(); });
     input.addEventListener("input", function () {
@@ -1775,16 +1799,28 @@
         // is nothing left to strip by hand -- but a lone "-" mid-typing is
         // not a number yet either, same as the old text field
         clean = (input.value === "-") ? "" : input.value;
+      } else if (s.decimal) {
+        // one decimal place -- "7." is left as a legal in-progress state,
+        // same reasoning as a signed field's lone "-"
+        var v2 = input.value.replace(/[^0-9.]/g, "");
+        var firstDot = v2.indexOf(".");
+        if (firstDot >= 0) v2 = v2.slice(0, firstDot + 1) + v2.slice(firstDot + 1).replace(/\./g, "");
+        var dotAt = v2.indexOf(".");
+        if (dotAt >= 0) v2 = v2.slice(0, dotAt + 2);
+        clean = v2;
+        if (clean !== input.value) input.value = clean;
       } else {
         var digits = input.value.replace(/[^0-9]/g, "").slice(0, s.len || 3);
         clean = digits;
         if (clean !== input.value) input.value = clean;
       }
+      var blank = clean === "" || clean === ".";     // "." alone is not a number yet either
       var d = day(cur);
-      if (clean === "") delete d[s.key]; else d[s.key] = +clean;
+      if (blank) delete d[s.key]; else d[s.key] = +clean;
       save(cur);
-      paintGauge(s, fill, clean === "" ? null : +clean);
-      paintBand(s, input, clean === "" ? null : +clean);
+      paintGauge(s, fill, blank ? null : +clean);
+      paintBand(s, input, blank ? null : +clean);
+      paintPct(s, pct, blank ? null : +clean, d);
       renderSummary();
       renderSupply();          // the pack reads from these very fields
     });
@@ -1795,13 +1831,25 @@
         if (v !== d[s.key]) { d[s.key] = v; input.value = v; save(cur); toast(s.label + " clamped to " + s.min + "–" + s.max); }
         paintGauge(s, fill, v);
         paintBand(s, input, v);
+        paintPct(s, pct, v, d);
       }
       renderSummary(); renderSupply(); renderGrid(); renderPatterns(); renderGuard();
     });
 
     $(hostId).appendChild(wrap);
-    statNodes[s.key] = { input: input, fill: fill, spec: s };
+    statNodes[s.key] = { input: input, fill: fill, pct: pct, spec: s };
   }); }
+
+  /* the share of the night a sleep stage took up, alongside its own raw
+     figure -- "33 min" also reads as "8% of the night". Blank whenever
+     there is nothing to divide by, same as the gauge and band. */
+  function paintPct(s, el, v, d) {
+    if (!el) return;                          // only Deep/REM/Light carry one
+    var mins = inBed((d && d.bed) || SLEEP_DEFAULT.bed, (d && d.wake) || SLEEP_DEFAULT.wake);
+    if (v === null || v === undefined || !mins) { el.textContent = ""; return; }
+    var own = s.toMinutes ? s.toMinutes(v) : v;
+    el.textContent = Math.round(own / mins * 100) + "%";
+  }
 
   function paintGauge(s, fill, v) {
     if (!fill) return;                       // a compact dose row has no gauge
@@ -1810,9 +1858,9 @@
   }
 
   /* A field's own `band(v)` returns "good" / "warn" / "bad", or nothing to
-     leave the number in its ordinary color. Only Sleep, Rest HR, and HRV
-     carry one — a CPAP score or a sleep-stage minute count has no such
-     reading yet, so it stays the default violet. */
+     leave the number in its ordinary color. Only Sleep, Rest HR, HRV and
+     CPAP carry one — a sleep-stage duration has no such reading yet, so it
+     stays the default violet. */
   function paintBand(s, input, v) {
     input.classList.remove("band-good", "band-warn", "band-bad");
     if (!s.band || v === null || v === undefined) return;
@@ -1936,12 +1984,15 @@
          is about to extend or break (the checkbox itself). A marker counts
          toward its streak, trend and Guardrails only once a start date is
          set -- a compact trigger shows it short; the native picker itself
-         only appears once tapped. */
+         only appears once tapped. `noStreak` markers (a plain record, not
+         a habit) skip both -- there is nothing here for a start date to
+         gate, and nothing to show a streak of. */
+      (m.noStreak ? '' :
       '<span class="mstart-wrap">' +
         '<button class="mstart-trigger code" type="button" aria-label="' + esc(m.name) + ' start date"></button>' +
         '<input class="mstart-input" type="date" tabindex="-1" hidden>' +
       '</span>' +
-      '<span class="streak zero num">0d</span>' +
+      '<span class="streak zero num">0d</span>') +
       '<span class="cell"><svg viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.2 5.2L20 7"/></svg></span>';
     function toggle() {
       var d = day(cur);
@@ -1963,21 +2014,23 @@
       });
       excuseNodes[m.key] = ex;
     }
-    var trig = b.querySelector(".mstart-trigger"), inp = b.querySelector(".mstart-input");
-    // tapping the trigger is not marking the day done, and must not fall through to the row
-    trig.addEventListener("click", function (e) {
-      e.stopPropagation();
-      inp.hidden = false;
-      try { inp.showPicker(); } catch (err) { inp.focus(); }
-    });
-    inp.addEventListener("click", function (e) { e.stopPropagation(); });
-    inp.addEventListener("change", function () {
-      saveMarkerStart(m.key, inp.value);
-      inp.hidden = true;
-      render();
-    });
-    inp.addEventListener("blur", function () { inp.hidden = true; });
-    startNodes[m.key] = { trig: trig, inp: inp };
+    if (!m.noStreak) {
+      var trig = b.querySelector(".mstart-trigger"), inp = b.querySelector(".mstart-input");
+      // tapping the trigger is not marking the day done, and must not fall through to the row
+      trig.addEventListener("click", function (e) {
+        e.stopPropagation();
+        inp.hidden = false;
+        try { inp.showPicker(); } catch (err) { inp.focus(); }
+      });
+      inp.addEventListener("click", function (e) { e.stopPropagation(); });
+      inp.addEventListener("change", function () {
+        saveMarkerStart(m.key, inp.value);
+        inp.hidden = true;
+        render();
+      });
+      inp.addEventListener("blur", function () { inp.hidden = true; });
+      startNodes[m.key] = { trig: trig, inp: inp };
+    }
     $(m.group || "rows").appendChild(b);
     rowNodes[m.key] = b;
 
@@ -2758,30 +2811,32 @@
          than the name, since it is a qualifier and not the thing itself */
       var tail = markerSub(m, cur);                       // target can vary by weekday
       node.querySelector(".row-sub").textContent = tail ? ": " + tail : "";
-      var startVal = effectiveStart(m) || "";
-      var sn = startNodes[m.key];
-      if (sn.inp.value !== startVal) sn.inp.value = startVal;
-      sn.trig.textContent = startVal ? fmtShortDate(startVal) : "Set Start";
+      if (!m.noStreak) {
+        var startVal = effectiveStart(m) || "";
+        var sn = startNodes[m.key];
+        if (sn.inp.value !== startVal) sn.inp.value = startVal;
+        sn.trig.textContent = startVal ? fmtShortDate(startVal) : "Set Start";
 
-      var tag = node.querySelector(".streak");
-      /* A lit excuse already says the day is not due, and says why. A second
-         pill beside it repeats that and costs enough width to wrap the name
-         onto a line of its own. */
-      var excused = !!(m.excuse && d[m.excuse.key]);
-      tag.hidden = excused;
-      if (excused) {
-        /* nothing more to say */
-      } else if (!due) {
-        tag.textContent = "Not Due";
-        tag.className = "streak rest code";
-      } else {
-        var s = streak(m), miss = s ? 0 : missStreak(m);
-        if (miss > MISS_LIMIT) {
-          tag.textContent = "−" + miss + "d";
-          tag.className = "streak num miss";
+        var tag = node.querySelector(".streak");
+        /* A lit excuse already says the day is not due, and says why. A second
+           pill beside it repeats that and costs enough width to wrap the name
+           onto a line of its own. */
+        var excused = !!(m.excuse && d[m.excuse.key]);
+        tag.hidden = excused;
+        if (excused) {
+          /* nothing more to say */
+        } else if (!due) {
+          tag.textContent = "Not Due";
+          tag.className = "streak rest code";
         } else {
-          tag.textContent = s + "d";
-          tag.className = "streak num" + (s === 0 ? " zero" : s >= 3 ? " hot" : "");
+          var s = streak(m), miss = s ? 0 : missStreak(m);
+          if (miss > MISS_LIMIT) {
+            tag.textContent = "−" + miss + "d";
+            tag.className = "streak num miss";
+          } else {
+            tag.textContent = s + "d";
+            tag.className = "streak num" + (s === 0 ? " zero" : s >= 3 ? " hot" : "");
+          }
         }
       }
 
@@ -2800,6 +2855,7 @@
       n.input.value = (v === undefined || v === null) ? "" : v;
       paintGauge(s, n.fill, v === undefined ? null : v);
       paintBand(s, n.input, v === undefined ? null : v);
+      paintPct(s, n.pct, v === undefined ? null : v, d);
     });
 
     /* Show the usual night even before the day has anything on it, so the

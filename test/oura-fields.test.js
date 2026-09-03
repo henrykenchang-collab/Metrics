@@ -36,10 +36,12 @@ const inp = cells.map(e => e.querySelector("input"));
 inp[0].value = "58"; inp[0].dispatchEvent(new c.w.Event("input", { bubbles: true }));
 inp[1].value = "35"; inp[1].dispatchEvent(new c.w.Event("input", { bubbles: true }));
 inp[2].value = "90"; inp[2].dispatchEvent(new c.w.Event("input", { bubbles: true }));
-inp[3].value = "700"; inp[3].dispatchEvent(new c.w.Event("input", { bubbles: true }));
-inp[3].dispatchEvent(new c.w.Event("blur", { bubbles: true }));
+inp[3].value = "7.5"; inp[3].dispatchEvent(new c.w.Event("input", { bubbles: true }));
 ok(store(c).avgHr === 58 && store(c).deepSleep === 35 && store(c).remSleep === 90, "typing records all three");
-ok(store(c).lightSleep === 600, "Light Sleep clamps to its 600 max: " + store(c).lightSleep);
+ok(store(c).lightSleep === 7.5, "Light Sleep reads in decimal hours: " + store(c).lightSleep);
+inp[3].value = "15"; inp[3].dispatchEvent(new c.w.Event("input", { bubbles: true }));
+inp[3].dispatchEvent(new c.w.Event("blur", { bubbles: true }));
+ok(store(c).lightSleep === 10, "and clamps to its 10-hour max: " + store(c).lightSleep);
 ok(!/NaN/.test(c.w.document.getElementById("grid").innerHTML), "grid clean");
 
 c.w.document.getElementById("copyBtn").dispatchEvent(new c.w.MouseEvent("click", { bubbles: true }));
@@ -48,7 +50,7 @@ setTimeout(() => {
   ok(/Average Resting Heart Rate/.test(head) && /Deep Sleep/.test(head) &&
      /REM Sleep/.test(head) && /Light Sleep/.test(head), "all four columns in the export: " + head);
   const line = copied.split("\n").find(l => l.indexOf(TODAY) === 0) || "";
-  ok(/,58,35,90,600,/.test(line), "and the values land in the row: " + line);
+  ok(/,58,35,90,10,/.test(line), "and the values land in the row: " + line);
 
   console.log("\n-- kept off the month grid, but still Patterns and guardrail trends --");
   const gl = [...c.w.document.getElementById("grid").querySelectorAll(".grid-label")].map(e => e.textContent);
@@ -79,6 +81,34 @@ setTimeout(() => {
   const c3 = open({ "dailyReadout.v1": JSON.stringify(seed) });
   ok(/Average Resting Heart Rate/.test(c3.w.document.getElementById("guard").textContent),
      "a 15 bpm rise over the week trips the guardrail");
+
+  console.log("\n-- Deep/REM/Light each show their share of the night --");
+  const pct = (w, label) => [...w.document.querySelectorAll("#stats2 .stat")]
+    .find(e => e.querySelector(".stat-label").textContent === label).querySelector(".stat-pct").textContent;
+  // 22:00 to 05:35 is 7h35m = 455 minutes in bed
+  const c4 = open({ "dailyReadout.v1": JSON.stringify({
+    [TODAY]: { bed: "22:00", wake: "05:35", deepSleep: 33, remSleep: 90, lightSleep: 7, _t: 1 } }) });
+  ok(pct(c4.w, "Deep") === "7%", "33 of 455 minutes: " + pct(c4.w, "Deep"));
+  ok(pct(c4.w, "REM") === "20%", "90 of 455 minutes: " + pct(c4.w, "REM"));
+  ok(pct(c4.w, "Light") === "92%", "Light's own hours convert back to minutes first: " + pct(c4.w, "Light"));
+  const avgHrCell = [...c4.w.document.querySelectorAll("#stats2 .stat")]
+    .find(e => e.querySelector(".stat-label").textContent === "Avg HR");
+  ok(!avgHrCell.querySelector(".stat-pct"), "Avg HR carries no percentage of its own");
+
+  console.log("\n-- blank without a value of its own, even against the usual assumed night --");
+  const c5 = open({});
+  ok(pct(c5.w, "Deep") === "", "nothing typed yet, so no percentage: " + JSON.stringify(pct(c5.w, "Deep")));
+  const c5b = open({ "dailyReadout.v1": JSON.stringify({ [TODAY]: { deepSleep: 33, _t: 1 } }) });
+  ok(pct(c5b.w, "Deep") !== "", "but with no bed/wake logged, it still reads against the usual assumed night: " + pct(c5b.w, "Deep"));
+
+  console.log("\n-- historical minutes convert to hours once, automatically --");
+  const OLD = shift(TODAY, -5);
+  const c6 = open({ "dailyReadout.v1": JSON.stringify({ [OLD]: { lightSleep: 420, vitamins: true, _t: 1 } }) });
+  ok(JSON.parse(c6.jar["dailyReadout.v1"])[OLD].lightSleep === 7,
+     "420 stored minutes reads as 7 hours after the one-time migration: " + JSON.parse(c6.jar["dailyReadout.v1"])[OLD].lightSleep);
+  const c7 = open({ "dailyReadout.v1": JSON.stringify({ [OLD]: { lightSleep: 7, vitamins: true, _t: 1 } }) });
+  ok(JSON.parse(c7.jar["dailyReadout.v1"])[OLD].lightSleep === 7,
+     "an already-migrated value (well under 24) is left alone");
 
   console.log(fail ? "\n" + fail + " FAILED" : "\nall passed");
   process.exit(fail ? 1 : 0);

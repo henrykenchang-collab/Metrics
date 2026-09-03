@@ -1,7 +1,7 @@
-/* Sleep, Rest HR, and HRV color their own number green/yellow/red against a
-   stated target range. Nothing else in Sleep & Recovery (CPAP, Avg HR,
-   Deep/REM/Light) has one -- guards the boundaries, the exclusivity, and
-   that typing/blur/day-switch all repaint it the same way. */
+/* Sleep, Rest HR, HRV and CPAP color their own number green/yellow/red
+   against a stated target range. Avg HR and Deep/REM/Light have none --
+   guards the boundaries, the exclusivity, and that typing/blur/day-switch
+   all repaint it the same way. */
 const fs = require("fs"), { JSDOM } = require("jsdom");
 const HTML = fs.readFileSync("/home/user/Metrics/daily-readout.html", "utf8");
 let fail = 0; const ok = (c, m) => { console.log((c ? "  PASS  " : "  FAIL  ") + m); if (!c) fail++; };
@@ -48,15 +48,15 @@ type(c.w, hrvIn, 39); ok(band(hrvIn) === "band-warn", "39 is warn");
 type(c.w, hrvIn, 35); ok(band(hrvIn) === "band-warn", "35 is warn");
 type(c.w, hrvIn, 34); ok(band(hrvIn) === "band-bad", "34 is bad");
 
-console.log("\n-- CPAP: red below 80, and nothing above it --");
+console.log("\n-- CPAP: >=85 good, <85 bad, no warn band --");
 c = open({});
 const cpapIn = cell(c.w, "CPAP").querySelector("input");
 ok(band(cpapIn) === null, "no band before typing");
-type(c.w, cpapIn, 79); ok(band(cpapIn) === "band-bad", "79 is bad");
+type(c.w, cpapIn, 84); ok(band(cpapIn) === "band-bad", "84 is bad");
 type(c.w, cpapIn, 0);  ok(band(cpapIn) === "band-bad", "0 is bad");
-type(c.w, cpapIn, 80); ok(band(cpapIn) === null, "80 is not red -- and not green either, no good end was ever stated");
-type(c.w, cpapIn, 100); ok(band(cpapIn) === null, "nor is 100");
-type(c.w, cpapIn, 75); ok(band(cpapIn) === "band-bad", "back under and it colours again");
+type(c.w, cpapIn, 85); ok(band(cpapIn) === "band-good", "85 is good");
+type(c.w, cpapIn, 100); ok(band(cpapIn) === "band-good", "and so is 100");
+type(c.w, cpapIn, 75); ok(band(cpapIn) === "band-bad", "back under and it reads bad again");
 type(c.w, cpapIn, "");
 ok(band(cpapIn) === null, "clearing it clears the colour");
 ok(!cpapIn.className.match(/band-(null|undefined)/), "an uncoloured band never leaves a junk class: " + cpapIn.className);
