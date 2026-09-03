@@ -3,7 +3,9 @@
    checkbox, the Markers Due Today count, the month grid) is unaffected by
    whether one is set. A marker already carrying real history gets one
    backfilled automatically, from the earliest day it has data for, so
-   nothing already being tracked goes quiet the moment this shipped. */
+   nothing already being tracked goes quiet the moment this shipped.
+   The field itself sits next to the streak as a compact trigger (a short
+   M/D/YY date); the native picker underneath only appears once tapped. */
 const fs = require("fs"), { JSDOM } = require("jsdom");
 const HTML = fs.readFileSync("/home/user/Metrics/daily-readout.html", "utf8");
 let fail = 0; const ok = (c, m) => { console.log((c ? "  PASS  " : "  FAIL  ") + m); if (!c) fail++; };
@@ -12,6 +14,7 @@ const shift = (k, n) => { const p = k.split("-"); const d = new Date(+p[0], +p[1
 const NOW = (() => { const d = new Date(); if (d.getDate() <= 10) { d.setDate(0); d.setDate(20); } return d; })();
 const TODAY = iso(NOW);
 const back = n => shift(TODAY, -n);
+const short = k => { const p = k.split("-"); return (+p[1]) + "/" + (+p[2]) + "/" + p[0].slice(2); };
 
 function open(jar) {
   jar = jar || {};
@@ -31,12 +34,23 @@ const row = (w, code) => [...w.document.querySelectorAll("#rows > .row, #petrows
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
 const day = (c, k) => JSON.parse(c.jar["dailyReadout.v1"] || "{}")[k] || {};
 const markStore = c => JSON.parse(c.jar["dailyReadout.markerStart"] || "{}");
+const trig = (w, code) => row(w, code).querySelector(".mstart-trigger");
+const inp = (w, code) => row(w, code).querySelector(".mstart-input");
+// tap the trigger, set the revealed native date field, commit
+const setStart = (c, code, v) => {
+  click(c.w, trig(c.w, code));
+  const i = inp(c.w, code);
+  i.value = v;
+  i.dispatchEvent(new c.w.Event("change", { bubbles: true }));
+};
 
 console.log("\n-- a marker with no history and no start date --");
 {
   const c = open({});
   const r = row(c.w, "KET");   // Keto: due every day, no hardcoded `since`
-  ok(r.querySelector(".mstart").value === "", "the field starts blank");
+  ok(trig(c.w, "KET").textContent === "Set Start", "the trigger reads a plain placeholder");
+  ok(inp(c.w, "KET").value === "", "and the field underneath starts blank");
+  ok(inp(c.w, "KET").hidden === true, "hidden until tapped");
   ok(!r.classList.contains("notdue"), "but the row itself still reads due");
   ok(r.querySelector(".streak").textContent === "0d", "the streak reads 0d -- nothing to count yet");
   const before = c.w.document.getElementById("scoreD").textContent;
@@ -46,16 +60,35 @@ console.log("\n-- a marker with no history and no start date --");
      "Markers Due Today is unaffected by the missing start date: " + before);
 }
 
+console.log("\n-- it sits right next to the streak --");
+{
+  const c = open({});
+  const kids = [...row(c.w, "KET").children].map(el => el.className);
+  const iStart = kids.findIndex(cl => /\bmstart-wrap\b/.test(cl));
+  const iStreak = kids.findIndex(cl => /\bstreak\b/.test(cl));
+  const iCell = kids.findIndex(cl => /\bcell\b/.test(cl));
+  ok(iStart === iStreak - 1 && iStreak === iCell - 1,
+     "start date, then streak, then the checkbox: " + kids.join(" | "));
+}
+
+console.log("\n-- tapping the trigger reveals the picker, without toggling the row --");
+{
+  const c = open({});
+  click(c.w, trig(c.w, "KET"));
+  ok(inp(c.w, "KET").hidden === false, "the native field appears");
+  ok(day(c, TODAY).keto === undefined, "the row itself was not marked done");
+}
+
 console.log("\n-- existing history is backfilled automatically --");
 {
   const seed = {};
   for (let i = 0; i < 6; i++) seed[back(i)] = { keto: true, vitamins: true, _t: 1 };
   const c = open({ "dailyReadout.v1": JSON.stringify(seed) });
-  const r = row(c.w, "KET");
-  ok(r.querySelector(".mstart").value === back(5),
-     "backfilled to the earliest day Keto has data for: " + r.querySelector(".mstart").value);
-  ok(r.querySelector(".streak").textContent === "6d",
-     "and the streak counts right away, no manual start date needed: " + r.querySelector(".streak").textContent);
+  ok(inp(c.w, "KET").value === back(5),
+     "backfilled to the earliest day Keto has data for: " + inp(c.w, "KET").value);
+  ok(trig(c.w, "KET").textContent === short(back(5)), "shown short on the trigger: " + trig(c.w, "KET").textContent);
+  ok(row(c.w, "KET").querySelector(".streak").textContent === "6d",
+     "and the streak counts right away, no manual start date needed: " + row(c.w, "KET").querySelector(".streak").textContent);
   ok(markStore(c).keto && markStore(c).keto.date === back(5), "and it is written to local storage");
 }
 
@@ -64,10 +97,10 @@ console.log("\n-- setting a start date by hand --");
   const seed = {};
   for (let i = 0; i < 8; i++) seed[back(i)] = { keto: true, vitamins: true, _t: 1 };
   const c = open({ "dailyReadout.v1": JSON.stringify(seed) });
-  const st = row(c.w, "KET").querySelector(".mstart");
-  ok(st.value === back(7), "backfilled first, same as above");
-  st.value = back(3);
-  st.dispatchEvent(new c.w.Event("change", { bubbles: true }));
+  ok(inp(c.w, "KET").value === back(7), "backfilled first, same as above");
+  setStart(c, "KET", back(3));
+  ok(inp(c.w, "KET").hidden === true, "the field hides again once committed");
+  ok(trig(c.w, "KET").textContent === short(back(3)), "the trigger updates: " + trig(c.w, "KET").textContent);
   ok(row(c.w, "KET").querySelector(".streak").textContent === "4d",
      "only the days on or after the new date count now: " + row(c.w, "KET").querySelector(".streak").textContent);
   ok(markStore(c).keto.date === back(3), "the override persists, replacing the backfilled value");
@@ -89,9 +122,7 @@ console.log("\n-- Guardrails only flags a lapse once a start date is in place --
   const guardText = c.w.document.getElementById("guard").textContent;
   ok(!/Keto/.test(guardText), "no start date yet -- the lapse stays quiet: " + guardText.slice(0, 120));
 
-  const st = row(c.w, "KET").querySelector(".mstart");
-  st.value = back(9);
-  st.dispatchEvent(new c.w.Event("change", { bubbles: true }));
+  setStart(c, "KET", back(9));
   ok(/Keto/.test(c.w.document.getElementById("guard").textContent),
      "start date set, the same lapse now flags: " + c.w.document.getElementById("guard").textContent.slice(0, 160));
 }
@@ -102,8 +133,8 @@ console.log("\n-- clearing a start date takes it back to not counting --");
   for (let i = 0; i < 5; i++) seed[back(i)] = { keto: true, vitamins: true, _t: 1 };
   const c = open({ "dailyReadout.v1": JSON.stringify(seed) });
   ok(row(c.w, "KET").querySelector(".streak").textContent === "5d", "counting to start with");
-  const st = row(c.w, "KET").querySelector(".mstart");
-  st.value = ""; st.dispatchEvent(new c.w.Event("change", { bubbles: true }));
+  setStart(c, "KET", "");
+  ok(trig(c.w, "KET").textContent === "Set Start", "the trigger goes back to a placeholder");
   ok(row(c.w, "KET").querySelector(".streak").textContent === "0d", "cleared, back to nothing counted");
   ok(!("keto" in markStore(c)), "and dropped from storage rather than kept as an empty entry");
 }
@@ -111,8 +142,8 @@ console.log("\n-- clearing a start date takes it back to not counting --");
 console.log("\n-- a marker with a hardcoded start date already has one --");
 {
   const c = open({});
-  const st = row(c.w, "SAU").querySelector(".mstart");
-  ok(st.value === "2026-08-17", "Sauna's schema `since` shows up in the field: " + st.value);
+  ok(inp(c.w, "SAU").value === "2026-08-17", "Sauna's schema `since` shows up in the field: " + inp(c.w, "SAU").value);
+  ok(trig(c.w, "SAU").textContent === "8/17/26", "and short on the trigger: " + trig(c.w, "SAU").textContent);
 }
 
 console.log(fail ? "\n" + fail + " FAILED" : "\nall passed");

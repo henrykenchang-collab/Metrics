@@ -41,29 +41,28 @@ setTimeout(()=>{
   const px=HTML.replace(/\s+/g," ").match(/\.corgi-mark \{[^}]*width: ([\d.]+)px/);
   ok(px&&parseFloat(px[1])<=16,"kept small: "+(px&&px[1])+"px");
 
-  console.log("\n-- Shanti, in colour, at the head of her own panel --");
+  console.log("\n-- Shanti, her own photo, at the head of her own panel --");
   const petHead=[...w.document.querySelectorAll("section.panel .panel-head")]
     .find(h=>h.textContent.indexOf("Shanti and Buddha")===0);
   ok(!!petHead,"the Shanti and Buddha head is found by its exact text");
   ok(petHead.querySelector(".code").textContent==="Shanti and Buddha",
-     "the heading text is untouched by the drawing sitting in it: "+JSON.stringify(petHead.querySelector(".code").textContent));
+     "the heading text is untouched by the photo sitting in it: "+JSON.stringify(petHead.querySelector(".code").textContent));
   const shanti=petHead.querySelector(".shanti-mark");
-  ok(!!shanti,"she is drawn there");
-  ok(shanti.tagName.toLowerCase()==="svg","inline, not a fetched image");
+  ok(!!shanti,"she is there");
+  ok(shanti.tagName.toLowerCase()==="img","her own photo, not a drawing");
   ok(shanti.getAttribute("aria-hidden")==="true","hidden from a screen reader; the heading already names her");
+  ok(shanti.getAttribute("alt")==="","decorative, so an empty alt rather than a missing one");
   ok(petHead.querySelector(".code").firstElementChild===shanti,"she sits before the words");
-  ok(shanti.querySelectorAll("[fill]").length>10,"a full-colour drawing, not a one-tone mark: "+shanti.querySelectorAll("[fill]").length+" filled parts");
-  // the ids she carries must not collide with anything else on the page
-  ["shHead","shBody","shEarL","shEarR","shSable"].forEach(id=>
-    ok(w.document.querySelectorAll("#"+id).length===1,id+" is unique in the document"));
-  ok(!w.document.querySelector(".shell .shanti-mark:not(.panel-head .shanti-mark)")
-     || [...w.document.querySelectorAll(".shanti-mark")].length===1,
+  ok(/^data:image\/png;base64,/.test(shanti.getAttribute("src")),
+     "embedded inline, not fetched from anywhere");
+  ok(shanti.getAttribute("src").length>1000,"a real photo, not a stub");
+  ok([...w.document.querySelectorAll(".shanti-mark")].length===1,
      "she appears once, in her own panel, and nowhere else");
 
   console.log("\n-- Buddha, right next to her --");
   const buddha=petHead.querySelector(".buddha-mark");
   ok(!!buddha,"he is there too");
-  ok(buddha.tagName.toLowerCase()==="img","his own photo now, not a drawing");
+  ok(buddha.tagName.toLowerCase()==="img","his own photo, not a drawing");
   ok(buddha.getAttribute("aria-hidden")==="true","hidden from a screen reader; the heading already names him");
   ok(buddha.getAttribute("alt")==="","decorative, so an empty alt rather than a missing one");
   const kids=[...petHead.querySelector(".code").children];

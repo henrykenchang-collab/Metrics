@@ -46,11 +46,15 @@ console.log("\n-- Extra/Under --");
 const names=[...c.w.document.querySelectorAll("#extras .dose-name")].map(e=>e.textContent);
 ok(names.join(" | ")==="Extra/Under IR: | Extra/Under XR:","headers read: "+names.join(" | "));
 const ir=c.w.document.querySelectorAll("#extras .dosein")[0];
+// a real number input, not a bare text field, so the up/down spinner and a
+// mouse-wheel scroll while focused both work -- the same reuse of a native
+// control Bed/Wake already get from type="time"
+ok(ir.type==="number","a native number input");
+ok(ir.min==="-40"&&ir.max==="40"&&ir.step==="1","min/max/step match the field's own range");
 ir.value="-20"; ir.dispatchEvent(new c.w.Event("input",{bubbles:true}));
 ok(store(c).extraIr===-20,"a negative records: "+store(c).extraIr);
 ir.value="-"; ir.dispatchEvent(new c.w.Event("input",{bubbles:true}));
-ok(ir.value==="-","a lone minus survives so you can finish typing");
-ok(store(c).extraIr===undefined,"but nothing is stored for it");
+ok(store(c).extraIr===undefined,"a lone minus is not a number yet, so nothing is stored for it");
 ir.value="-5"; ir.dispatchEvent(new c.w.Event("input",{bubbles:true}));
 ok(store(c).extraIr===-5,"then -5 lands");
 ir.value="15"; ir.dispatchEvent(new c.w.Event("input",{bubbles:true}));

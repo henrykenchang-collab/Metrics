@@ -55,7 +55,7 @@ ok(title(c.w,"KET")==="Keto","and so does Keto");
 ok(title(c.w,"WLK")==="Walk with Shanti: PM · Not Sat","target and schedule combine");
 ok(/^Read: 15 Min · Not Sat$|^Read: 30 Min · Not Sat$/.test(title(c.w,"RDG")),
    "Read carries its target too: "+title(c.w,"RDG"));
-ok(rowFor(c.w,"SAU").querySelectorAll(".row-name > *").length===2,"one line, the schedule span and the start-date field");
+ok(rowFor(c.w,"SAU").querySelectorAll(".row-name > *").length===1,"one line, one nested span -- the start date moved out, next to the streak");
 
 console.log("\n-- Artificial Daylight --");
 ok(!!rowFor(c.w,"LGT"),"an LGT row exists");
