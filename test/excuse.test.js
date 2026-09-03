@@ -78,7 +78,7 @@ ok(plain.n <= 3, "the plain miss really does stop it: " + plain.n + "d");
 ok(!/Walk with Shanti/.test(r.w.document.getElementById("guard").textContent),
    "no guardrail miss: " + r.w.document.getElementById("guard").textContent.slice(0, 100));
 
-console.log("\n-- layout: Rain, then PTO, then the streak, all before the checkbox --");
+console.log("\n-- layout: Rain, then the streak, all before the checkbox --");
 {
   const x = open({});
   const kids = [...row(x.w, "WLK").children].map(el => el.className);
@@ -90,7 +90,7 @@ console.log("\n-- layout: Rain, then PTO, then the streak, all before the checkb
   const iCell = kids.findIndex(c2 => /\bcell\b/.test(c2));
   ok(iCode < iName, "code, then the name: " + kids.join(" | "));
   ok(iOwn === iName + 1, "the marker's own excuse sits right after the name: " + kids.join(" | "));
-  ok(iPto === iOwn + 1, "and the universal PTO excuse sits right after that: " + kids.join(" | "));
+  ok(iPto === -1, "Shanti and Buddha's own panel opts out of PTO entirely: " + kids.join(" | "));
   ok(iStreak === iCell - 1, "and the streak sits directly before the checkbox: " + kids.join(" | "));
   // a marker with no excuse of its own still grows the universal PTO button
   const plain = [...row(x.w, "GYM").children].map(el => el.className);

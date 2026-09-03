@@ -37,17 +37,20 @@ const pto = (w, code) => row(w, code).querySelector(".excuse.pto");
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
 const day = (c, k) => JSON.parse(c.jar["dailyReadout.v1"] || "{}")[k] || {};
 
-console.log("\n-- every marker grows one, keyed to itself --");
+console.log("\n-- every marker grows one, except Shanti and Buddha's own panel --");
 {
   const c = open({});
-  ["VIT", "KET", "GYM", "WLK"].forEach(code => {
+  ["VIT", "KET", "GYM"].forEach(code => {
     const btn = pto(c.w, code);
     ok(!!btn, code + " carries a PTO control");
     ok(btn.textContent === "PTO", "labelled PTO: " + btn.textContent);
   });
-  ok(c.w.document.querySelectorAll("#rows > .row, #petrows > .row").length ===
+  ["WLK", "BUD", "SHA"].forEach(code => {
+    ok(!pto(c.w, code), code + " opts out -- no work-vacation concept in Shanti and Buddha's panel");
+  });
+  ok(c.w.document.querySelectorAll("#rows > .row").length ===
      c.w.document.querySelectorAll(".excuse.pto").length,
-     "one PTO control per marker row, no more, no fewer");
+     "one PTO control per Daily Markers row, and none in petrows");
 }
 
 console.log("\n-- excusing is not doing, and it clears the same way --");

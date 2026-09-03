@@ -1036,18 +1036,20 @@
        (Rain only ever applies to a walk); PTO is the same idea but offered
        on every marker independently, since a vacation day might excuse one
        habit and not another -- see the universal PTO button built into
-       every row below, rather than a schema field here. */
+       every row below, rather than a schema field here. `noPto` opts a
+       marker out of that button entirely -- Shanti and Buddha's own
+       panel doesn't carry a work-vacation concept. */
     { key: "walkpm",      code: "WLK", name: "Walk with Shanti", sub: "PM",
-      days: [0, 1, 2, 3, 4, 5], group: "petrows",
+      days: [0, 1, 2, 3, 4, 5], group: "petrows", noPto: true,
       excuse: { key: "walkRain", label: "Rain" } },
     /* Weekly, not daily — due on Sunday only — and, being brand new
        practices as of today, `since` keeps any day before this one from
        ever reading as a lapse. `noGrid` keeps them off the month table:
        once-a-week rows would read mostly as ghost squares there. */
     { key: "buddhaBrush", code: "BUD", name: "Buddha Brush", group: "petrows",
-      days: [0], since: "2026-08-30", noGrid: true },
+      days: [0], since: "2026-08-30", noGrid: true, noPto: true },
     { key: "shantiBrush", code: "SHA", name: "Shanti Brush", group: "petrows",
-      days: [0], since: "2026-08-30", noGrid: true }
+      days: [0], since: "2026-08-30", noGrid: true, noPto: true }
   ];
 
   /* The individual vitamins under Vitamins: a reference sheet, not a
@@ -1389,7 +1391,7 @@
     if (m.days && m.days.indexOf(dow(k)) < 0) return false;
     if (m.noHoliday && holidayName(k)) return false;
     if (m.excuse && data[k] && data[k][m.excuse.key]) return false;
-    if (data[k] && data[k][ptoKey(m)]) return false;
+    if (!m.noPto && data[k] && data[k][ptoKey(m)]) return false;
     return true;
   }
 
@@ -1998,8 +2000,8 @@
       '<span class="row-name">' + esc(m.name) + '<span class="row-sub"></span></span>' +
       (m.excuse ? '<button class="excuse own" type="button" aria-pressed="false">' +
                   esc(m.excuse.label) + '</button>' : '') +
-      // every marker gets its own, independent PTO excuse -- not just the ones with a schema `excuse`
-      '<button class="excuse pto" type="button" aria-pressed="false">PTO</button>' +
+      // every marker gets its own, independent PTO excuse -- not just the ones with a schema `excuse` -- except `noPto` ones
+      (m.noPto ? '' : '<button class="excuse pto" type="button" aria-pressed="false">PTO</button>') +
       /* all three sit right before the checkbox, in the order they answer
          a question about it: since when (start), how far (streak), what it
          is about to extend or break (the checkbox itself). A marker counts
@@ -2035,15 +2037,17 @@
       });
       excuseNodes[m.key] = ex;
     }
-    var pb = b.querySelector(".excuse.pto");
-    pb.setAttribute("aria-label", m.name + ": PTO");
-    pb.addEventListener("click", function (e) {
-      e.stopPropagation();                          // excusing it is not doing it
-      var d = day(cur), k = ptoKey(m);
-      if (d[k]) delete d[k]; else d[k] = true;
-      save(cur); render();
-    });
-    ptoNodes[m.key] = pb;
+    if (!m.noPto) {
+      var pb = b.querySelector(".excuse.pto");
+      pb.setAttribute("aria-label", m.name + ": PTO");
+      pb.addEventListener("click", function (e) {
+        e.stopPropagation();                        // excusing it is not doing it
+        var d = day(cur), k = ptoKey(m);
+        if (d[k]) delete d[k]; else d[k] = true;
+        save(cur); render();
+      });
+      ptoNodes[m.key] = pb;
+    }
     if (!m.noStreak) {
       var trig = b.querySelector(".mstart-trigger"), inp = b.querySelector(".mstart-input");
       // tapping the trigger is not marking the day done, and must not fall through to the row
@@ -2836,7 +2840,9 @@
       if (excuseNodes[m.key]) {
         excuseNodes[m.key].setAttribute("aria-pressed", d[m.excuse.key] ? "true" : "false");
       }
-      ptoNodes[m.key].setAttribute("aria-pressed", d[ptoKey(m)] ? "true" : "false");
+      if (ptoNodes[m.key]) {
+        ptoNodes[m.key].setAttribute("aria-pressed", d[ptoKey(m)] ? "true" : "false");
+      }
 
       /* the schedule rides on the name rather than under it; still quieter
          than the name, since it is a qualifier and not the thing itself */
@@ -2852,7 +2858,7 @@
         /* A lit excuse already says the day is not due, and says why. A second
            pill beside it repeats that and costs enough width to wrap the name
            onto a line of its own. */
-        var excused = !!((m.excuse && d[m.excuse.key]) || d[ptoKey(m)]);
+        var excused = !!((m.excuse && d[m.excuse.key]) || (!m.noPto && d[ptoKey(m)]));
         tag.hidden = excused;
         if (excused) {
           /* nothing more to say */
