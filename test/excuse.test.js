@@ -38,19 +38,20 @@ const day = (c, k) => JSON.parse(c.jar["dailyReadout.v1"] || "{}")[k] || {};
 console.log("\n-- the control --");
 let c = open({});
 const wlk = row(c.w, "WLK");
-const rain = wlk.querySelector(".excuse");
-ok(!!rain, "Walk with Shanti carries an excuse control");
+const rain = wlk.querySelector(".excuse.own");
+ok(!!rain, "Walk with Shanti carries its own excuse control");
 ok(rain.textContent === "Rain", "labelled Rain: " + rain.textContent);
 ok(rain.tagName.toLowerCase() === "button", "it is a real button");
-ok(c.w.document.querySelectorAll(".excuse").length === 1, "and it is the only one -- no other marker grew one");
+ok(c.w.document.querySelectorAll(".excuse.own").length === 1,
+   "and it is the only marker-specific excuse -- no other marker grew one of its own");
 
 console.log("\n-- excusing is not doing --");
 click(c.w, rain);
 ok(day(c, TODAY).walkRain === true, "Rain records");
 ok(day(c, TODAY).walkpm === undefined, "and the walk itself stays untouched");
-ok(row(c.w, "WLK").querySelector(".excuse").getAttribute("aria-pressed") === "true", "the control reads pressed");
+ok(row(c.w, "WLK").querySelector(".excuse.own").getAttribute("aria-pressed") === "true", "the control reads pressed");
 ok(row(c.w, "WLK").classList.contains("notdue"), "the row now reads not due");
-click(c.w, row(c.w, "WLK").querySelector(".excuse"));
+click(c.w, row(c.w, "WLK").querySelector(".excuse.own"));
 ok(day(c, TODAY).walkRain === undefined, "clicking it again clears it");
 ok(!row(c.w, "WLK").classList.contains("notdue"), "and the walk is due again");
 // the row underneath still toggles the walk
@@ -77,25 +78,28 @@ ok(plain.n <= 3, "the plain miss really does stop it: " + plain.n + "d");
 ok(!/Walk with Shanti/.test(r.w.document.getElementById("guard").textContent),
    "no guardrail miss: " + r.w.document.getElementById("guard").textContent.slice(0, 100));
 
-console.log("\n-- layout: the streak and the excuse both sit right before the checkbox --");
+console.log("\n-- layout: Rain, then PTO, then the streak, all before the checkbox --");
 {
   const x = open({});
   const kids = [...row(x.w, "WLK").children].map(el => el.className);
   const iCode = kids.findIndex(c2 => /\brow-code\b/.test(c2));
   const iName = kids.findIndex(c2 => /\brow-name\b/.test(c2));
-  const iExcuse = kids.findIndex(c2 => /\bexcuse\b/.test(c2));
+  const iOwn = kids.findIndex(c2 => /\bexcuse own\b/.test(c2));
+  const iPto = kids.findIndex(c2 => /\bexcuse pto\b/.test(c2));
   const iStreak = kids.findIndex(c2 => /\bstreak\b/.test(c2));
   const iCell = kids.findIndex(c2 => /\bcell\b/.test(c2));
   ok(iCode < iName, "code, then the name: " + kids.join(" | "));
-  ok(iExcuse === iName + 1, "the excuse sits right after the name: " + kids.join(" | "));
+  ok(iOwn === iName + 1, "the marker's own excuse sits right after the name: " + kids.join(" | "));
+  ok(iPto === iOwn + 1, "and the universal PTO excuse sits right after that: " + kids.join(" | "));
   ok(iStreak === iCell - 1, "and the streak sits directly before the checkbox: " + kids.join(" | "));
-  // a marker with no excuse keeps the same left-to-right code/name/streak/cell shape
+  // a marker with no excuse of its own still grows the universal PTO button
   const plain = [...row(x.w, "GYM").children].map(el => el.className);
-  const pStreak = plain.findIndex(c2 => /\bstreak\b/.test(c2));
   const pName = plain.findIndex(c2 => /\brow-name\b/.test(c2));
+  const pPto = plain.findIndex(c2 => /\bexcuse pto\b/.test(c2));
+  const pStreak = plain.findIndex(c2 => /\bstreak\b/.test(c2));
   const pCell = plain.findIndex(c2 => /\bcell\b/.test(c2));
-  ok(pName < pStreak && pStreak === pCell - 1,
-     "true of an ordinary row too, not just the one with an excuse: " + plain.join(" | "));
+  ok(pName < pPto && pPto === pStreak - 2 && pStreak === pCell - 1,
+     "PTO sits right after the name (ahead of the start-date field), on an ordinary row too: " + plain.join(" | "));
 }
 
 console.log("\n-- Rain is orange, in both states --");
@@ -115,10 +119,10 @@ console.log("\n-- the excuse replaces the Not Due pill rather than sitting besid
   const r2 = () => row(x.w, "WLK");
   const tag = () => r2().querySelector(".streak");
   ok(tag().hidden === false, "the streak pill is there to begin with");
-  click(x.w, r2().querySelector(".excuse"));
+  click(x.w, r2().querySelector(".excuse.own"));
   ok(tag().hidden === true,
      "excused, it goes -- the lit Rain already says not due, and two pills wrap the name");
-  click(x.w, r2().querySelector(".excuse"));
+  click(x.w, r2().querySelector(".excuse.own"));
   ok(tag().hidden === false, "and comes back when the excuse is lifted");
   ok(tag().textContent.endsWith("d"), "reading a streak again: " + tag().textContent);
 }

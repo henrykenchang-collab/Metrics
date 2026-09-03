@@ -1024,13 +1024,6 @@
     { key: "th",       code: "TH",  name: "TH",  invert: true },
     { key: "yt",       code: "YT",  name: "YT",  invert: true },
 
-    /* A record of the day, not a habit -- a running streak of vacation days,
-       or a Guardrails alert for going too long without one, would both be
-       nonsensical, so `noStreak` drops the streak pill and the start-date
-       field entirely (there is nothing here for a start date to gate), on
-       top of the `noGuard` every settled-in marker already has. */
-    { key: "pto",      code: "PTO", name: "PTO", noGuard: true, noStreak: true },
-
     /* `group` names the panel body a marker renders into; without one it
        goes to Daily Markers. Only the rendering splits — streaks, the
        readout's due count, the guardrails and the export all walk MARKERS
@@ -1039,7 +1032,11 @@
     /* An excuse is a day the marker was genuinely not askable, as opposed to
        one you skipped: it makes the day not due, so it reads N/A and counts
        nowhere -- not in the streak, the readout, the guardrails, the month
-       table or Patterns. */
+       table or Patterns. `m.excuse` is a reason specific to one marker
+       (Rain only ever applies to a walk); PTO is the same idea but offered
+       on every marker independently, since a vacation day might excuse one
+       habit and not another -- see the universal PTO button built into
+       every row below, rather than a schema field here. */
     { key: "walkpm",      code: "WLK", name: "Walk with Shanti", sub: "PM",
       days: [0, 1, 2, 3, 4, 5], group: "petrows",
       excuse: { key: "walkRain", label: "Rain" } },
@@ -1380,6 +1377,8 @@
   function hm(m) { return Math.floor(m / 60) + "h " + String(m % 60).padStart(2, "0") + "m"; }
 
   /* ---- schedules ---- */
+  // every marker's own, independent PTO excuse -- see the comment on walkpm above
+  function ptoKey(m) { return m.key + "Pto"; }
   /* `noHoliday` drops the federal holidays out of a weekday schedule, for the
      things that are only due because it is a working day. Everything that
      asks whether a marker is due -- the streaks, the readout's denominator,
@@ -1390,6 +1389,7 @@
     if (m.days && m.days.indexOf(dow(k)) < 0) return false;
     if (m.noHoliday && holidayName(k)) return false;
     if (m.excuse && data[k] && data[k][m.excuse.key]) return false;
+    if (data[k] && data[k][ptoKey(m)]) return false;
     return true;
   }
 
@@ -1982,7 +1982,7 @@
     pillNodes[c.key] = nodes;
   });
 
-  var rowNodes = {}, excuseNodes = {}, startNodes = {}, vitWrapNode = null;
+  var rowNodes = {}, excuseNodes = {}, ptoNodes = {}, startNodes = {}, vitWrapNode = null;
   /* A div rather than a button, because a marker carrying an excuse has a
      second control inside it and a button cannot hold one. The row keeps its
      whole-surface tap target either way -- the excuse stops the click from
@@ -1996,8 +1996,10 @@
     b.innerHTML =
       '<span class="code row-code">' + m.code + '</span>' +
       '<span class="row-name">' + esc(m.name) + '<span class="row-sub"></span></span>' +
-      (m.excuse ? '<button class="excuse" type="button" aria-pressed="false">' +
+      (m.excuse ? '<button class="excuse own" type="button" aria-pressed="false">' +
                   esc(m.excuse.label) + '</button>' : '') +
+      // every marker gets its own, independent PTO excuse -- not just the ones with a schema `excuse`
+      '<button class="excuse pto" type="button" aria-pressed="false">PTO</button>' +
       /* all three sit right before the checkbox, in the order they answer
          a question about it: since when (start), how far (streak), what it
          is about to extend or break (the checkbox itself). A marker counts
@@ -2023,7 +2025,7 @@
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
     });
     if (m.excuse) {
-      var ex = b.querySelector(".excuse");
+      var ex = b.querySelector(".excuse.own");
       ex.setAttribute("aria-label", m.name + ": " + m.excuse.label);
       ex.addEventListener("click", function (e) {
         e.stopPropagation();                       // excusing it is not doing it
@@ -2033,6 +2035,15 @@
       });
       excuseNodes[m.key] = ex;
     }
+    var pb = b.querySelector(".excuse.pto");
+    pb.setAttribute("aria-label", m.name + ": PTO");
+    pb.addEventListener("click", function (e) {
+      e.stopPropagation();                          // excusing it is not doing it
+      var d = day(cur), k = ptoKey(m);
+      if (d[k]) delete d[k]; else d[k] = true;
+      save(cur); render();
+    });
+    ptoNodes[m.key] = pb;
     if (!m.noStreak) {
       var trig = b.querySelector(".mstart-trigger"), inp = b.querySelector(".mstart-input");
       // tapping the trigger is not marking the day done, and must not fall through to the row
@@ -2825,6 +2836,7 @@
       if (excuseNodes[m.key]) {
         excuseNodes[m.key].setAttribute("aria-pressed", d[m.excuse.key] ? "true" : "false");
       }
+      ptoNodes[m.key].setAttribute("aria-pressed", d[ptoKey(m)] ? "true" : "false");
 
       /* the schedule rides on the name rather than under it; still quieter
          than the name, since it is a qualifier and not the thing itself */
@@ -2840,7 +2852,7 @@
         /* A lit excuse already says the day is not due, and says why. A second
            pill beside it repeats that and costs enough width to wrap the name
            onto a line of its own. */
-        var excused = !!(m.excuse && d[m.excuse.key]);
+        var excused = !!((m.excuse && d[m.excuse.key]) || d[ptoKey(m)]);
         tag.hidden = excused;
         if (excused) {
           /* nothing more to say */

@@ -48,7 +48,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 (async () => {
   console.log("\n-- render --");
   let a = open(wrap(BUILT), {}, false);
-  ok(a.w.document.querySelectorAll("#rows > .row, #petrows > .row").length === 16, "16 marker rows rendered");
+  ok(a.w.document.querySelectorAll("#rows > .row, #petrows > .row").length === 15, "15 marker rows rendered");
   ok(/Sun–Tue/.test(a.w.document.getElementById("rows").textContent), 'sauna reads "Sun–Tue"');
   await wait(50);
   ok(a.w.document.getElementById("syncText").textContent === "This device only",

@@ -27,7 +27,7 @@ const codes = w => [...w.document.getElementById("rows").children]
   .map(el => el.querySelector(".row-code").textContent);
 
 const w = open("2026-09-09");   // Wednesday
-const DUE = ["VIT", "GRN", "KET", "CLD", "RUN", "WWK", "RDG", "LGT", "TH", "YT", "PTO"];
+const DUE = ["VIT", "GRN", "KET", "CLD", "RUN", "WWK", "RDG", "LGT", "TH", "YT"];
 const NOTDUE = ["SAU", "GYM"];
 
 console.log("\n-- due markers stay together at the top, in schema order --");
@@ -47,7 +47,7 @@ console.log("\n-- it re-sorts on a day where the split is different --");
 // Walk (Work), Read) is off, so almost the whole list flips to the bottom
 const wSat = open("2026-09-12");
 const orderSat = codes(wSat);
-const DUE_SAT = ["VIT", "KET", "LGT", "TH", "YT", "PTO"];
+const DUE_SAT = ["VIT", "KET", "LGT", "TH", "YT"];
 const NOTDUE_SAT = ["SAU", "GRN", "CLD", "RUN", "GYM", "WWK", "RDG"];
 ok(orderSat.join(",") === DUE_SAT.concat(NOTDUE_SAT).join(","),
    "a different split, same rule -- due first, schema order within each half: " + orderSat.join(","));
