@@ -158,17 +158,19 @@
     padding: 12px 16px; color: var(--ink-3); font-size: 12.5px;
   }
   .lessonrow {
-    display: grid; grid-template-columns: auto auto 1fr auto; align-items: start;
+    display: grid; grid-template-columns: auto minmax(0, 112px) 1fr auto; align-items: start;
     gap: 9px; padding: 9px 16px; border-bottom: 1px solid var(--line);
     cursor: pointer; -webkit-tap-highlight-color: transparent;
   }
   .lessonrow:last-child { border-bottom: 0; }
   .lessonrow-date { font-family: var(--mono); font-size: 11px; color: var(--ink-3); white-space: nowrap; padding-top: 2px; }
+  /* an entry can carry more than one tag now, so this wraps a handful of
+     chips instead of holding just the one */
+  .lessonrow-tags { display: flex; flex-wrap: wrap; gap: 4px; }
   .lessonrow-tag {
     font-size: 11px; color: var(--ink-2); background: var(--surface-2);
-    border-radius: 999px; padding: 2px 9px; white-space: nowrap; height: fit-content;
+    border-radius: 999px; padding: 2px 9px; white-space: nowrap;
   }
-  .lessonrow-tag:empty { display: none; }
   .lessonrow-text { font-size: 13.5px; color: var(--ink); line-height: 1.4; word-break: break-word; }
   .lessonrow-del {
     width: 22px; height: 22px; flex: none; border-radius: 6px;
@@ -349,6 +351,11 @@
   .tag.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
   .tag:active { transform: scale(.94); }
   .tag.add { border-style: dashed; color: var(--ink-3); }
+  /* Factors alone: ~15 buttons live in one box, so these run as compact as
+     a pill can and still be tapped -- smaller text, tighter padding, a
+     tighter gap between them than the shared default above. */
+  #taglist { gap: 4px; }
+  #taglist .tag { font-size: 9.5px; padding: 3px 7px; }
   .tagform { display: flex; gap: 7px; }
   .tagform[hidden] { display: none; }
   .taginput {
@@ -844,7 +851,7 @@
   </section>
 
   <section class="panel">
-    <div class="panel-head"><span class="code">Daily Markers</span><span class="code">Streak</span></div>
+    <div class="panel-head"><span class="code">Daily Markers</span><span class="code">Start Date</span><span class="code">Streak</span></div>
     <div id="rows"></div>
     <div class="doses" id="extras"></div>
   </section>
@@ -1497,7 +1504,7 @@
   // same idea, for a Lessons Learned list -- id-ordered rather than date-ordered
   function sigList(list) {
     return list.slice().sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; })
-      .map(function (e) { return e.id + ":" + e.date + "|" + e.tag + "|" + e.text; }).join("#");
+      .map(function (e) { return e.id + ":" + e.date + "|" + (e.tags || []).join(",") + "|" + e.text; }).join("#");
   }
 
   var seeded = readSeed(), localDays = {}, localTags = [], localFoods = [], localLessonTags = [], localVitInfo = {}, localMarkerStart = {};
@@ -1528,6 +1535,18 @@
   markerStart = mergeDays(seeded.markerStart, localMarkerStart);
   lessonsPositive = mergeList(seeded.lessons.positive, localLessons.positive);
   lessonsNegative = mergeList(seeded.lessons.negative, localLessons.negative);
+  // a single `tag` (one pick) became `tags` (several) -- carry any already
+  // saved under the old shape forward rather than dropping it
+  var lessonTagsMigrated = false;
+  [lessonsPositive, lessonsNegative].forEach(function (list) {
+    list.forEach(function (e) {
+      if (e.tag !== undefined && !e.tags) { e.tags = [e.tag]; delete e.tag; lessonTagsMigrated = true; }
+      else if (!e.tags) e.tags = [];
+    });
+  });
+  if (lessonTagsMigrated) {
+    try { localStorage.setItem(LESSONSTORE, JSON.stringify({ positive: lessonsPositive, negative: lessonsNegative })); } catch (e) {}
+  }
 
   function persistLocal() {
     try { localStorage.setItem(STORE, JSON.stringify(data)); }
@@ -3416,14 +3435,16 @@
   function newLessonId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
   var lessonEditing = { Pos: null, Neg: null };    // entry id mid-edit, or null while adding
-  var lessonPickedTag = { Pos: "", Neg: "" };      // the open form's current single tag pick
+  var lessonPickedTags = { Pos: [], Neg: [] };     // the open form's current tag picks
 
   function lessonRow(entry, p) {
     var row = document.createElement("div");
     row.className = "lessonrow";
     row.innerHTML =
       '<span class="lessonrow-date">' + esc(fmtShortDate(entry.date)) + '</span>' +
-      '<span class="lessonrow-tag">' + esc(entry.tag || "") + '</span>' +
+      '<span class="lessonrow-tags">' +
+        (entry.tags || []).map(function (t) { return '<span class="lessonrow-tag">' + esc(t) + '</span>'; }).join("") +
+      '</span>' +
       '<span class="lessonrow-text">' + esc(entry.text) + '</span>' +
       '<button class="lessonrow-del" type="button" aria-label="Delete this entry">×</button>';
     row.addEventListener("click", function () { openLessonForm(p, entry); });
@@ -3443,18 +3464,20 @@
       .forEach(function (entry) { host.appendChild(lessonRow(entry, p)); });
   }
 
-  // a single pick, not a multi-select -- tapping the picked tag again clears it
+  // a multi-select -- an entry can carry more than one tag, so tapping a
+  // picked tag again just drops it back out of the pick, same as any other
   function renderLessonTagPick(p) {
     var host = $("lessons" + p + "TagPick");
     host.innerHTML = "";
     allLessonTags().forEach(function (t) {
       var b = document.createElement("button");
-      var picked = lessonPickedTag[p] === t;
+      var picked = lessonPickedTags[p].indexOf(t) >= 0;
       b.className = "tag" + (picked ? " on" : "");
       b.type = "button"; b.textContent = t;
       b.setAttribute("aria-pressed", picked ? "true" : "false");
       b.addEventListener("click", function () {
-        lessonPickedTag[p] = picked ? "" : t;
+        var i = lessonPickedTags[p].indexOf(t);
+        if (i >= 0) lessonPickedTags[p].splice(i, 1); else lessonPickedTags[p].push(t);
         renderLessonTagPick(p);
       });
       host.appendChild(b);
@@ -3473,14 +3496,14 @@
       customLessonTags.push(v); saveLessonTags();
     }
     var canon = allLessonTags().filter(function (t) { return t.toLowerCase() === v.toLowerCase(); })[0] || v;
-    lessonPickedTag[p] = canon;
+    if (lessonPickedTags[p].indexOf(canon) < 0) lessonPickedTags[p].push(canon);
     input.value = ""; form.hidden = true;
     renderLessonTagPick(p);
   }
 
   function openLessonForm(p, entry) {
     lessonEditing[p] = entry ? entry.id : null;
-    lessonPickedTag[p] = entry ? (entry.tag || "") : "";
+    lessonPickedTags[p] = entry ? (entry.tags || []).slice() : [];
     $("lessons" + p + "Date").value = entry ? entry.date : todayISO();
     $("lessons" + p + "Note").value = entry ? entry.text : "";
     $("lessons" + p + "TagForm").hidden = true;
@@ -3501,7 +3524,7 @@
     var entry = id ? list.filter(function (e) { return e.id === id; })[0] : null;
     if (!entry) { entry = { id: newLessonId() }; list.push(entry); }
     entry.date = $("lessons" + p + "Date").value || todayISO();
-    entry.tag = lessonPickedTag[p];
+    entry.tags = lessonPickedTags[p].slice();
     entry.text = text;
     entry[STAMP] = Date.now();
     saveLessons();

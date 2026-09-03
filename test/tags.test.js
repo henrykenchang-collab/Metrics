@@ -152,5 +152,22 @@ console.log("\n-- Factors folds, and starts shut --");
 console.log("\n-- the factor pills are small --");
 ok(/\.tag \{[^}]*font-size: 11px/.test(HTML), "shrunk from the original 12.5px");
 
+console.log("\n-- Factors' pills are shrunk further still, scoped to that panel alone --");
+{
+  const css = HTML.replace(/\s+/g, " ");
+  const m = css.match(/#taglist \.tag \{([^}]*)\}/);
+  ok(!!m, "a Factors-scoped override exists");
+  ok(m && /font-size: [0-9.]+px/.test(m[1]) && parseFloat(m[1].match(/font-size: ([0-9.]+)px/)[1]) < 11,
+     "smaller than the shared 11px baseline: " + (m && m[1]));
+  const c = open({});
+  const pill = c.w.document.getElementById("taglist").querySelector(".tag:not(.add)");
+  ok(pill.className.split(" ").indexOf("tag") >= 0,
+     "still just the shared .tag class -- the size comes from the #taglist scope, not a new class");
+  // Lessons Learned tag-pick pills reuse the same base .tag class -- confirm
+  // the override lives under #taglist and does not touch that markup
+  ok(!/#lessons\w*TagPick \.tag \{[^}]*font-size/.test(css),
+     "Lessons Learned's tag picker keeps its own size, untouched by the Factors override");
+}
+
 console.log(fail ? "\n" + fail + " FAILED" : "\nall passed");
 process.exit(fail ? 1 : 0);

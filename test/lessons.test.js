@@ -112,10 +112,11 @@ console.log("\n-- a note is required, a tag is not --");
   fill(c, "Pos", { note: "Good focus after a walk" });
   save(c, "Pos");
   ok(rows(c.w, "Pos").length === 1, "saves fine with no tag picked");
-  ok(rows(c.w, "Pos")[0].querySelector(".lessonrow-tag").textContent === "", "tag column is blank, not \"undefined\"");
+  ok(rows(c.w, "Pos")[0].querySelector(".lessonrow-tags").children.length === 0,
+     "tag column is empty, not a stray chip");
 }
 
-console.log("\n-- tags: typed once, offered on both, one pick per entry --");
+console.log("\n-- tags: typed once, offered on both, and now several can be picked per entry --");
 {
   const c = open({});
   openView(c);
@@ -125,28 +126,35 @@ console.log("\n-- tags: typed once, offered on both, one pick per entry --");
   click(c.w, c.w.document.getElementById("lessonsPosTagSave"));
   ok(c.w.document.getElementById("lessonsPosTagPick").querySelector(".tag.on").textContent === "Good Sleep",
      "typing a new tag picks it immediately");
+  click(c.w, c.w.document.getElementById("lessonsPosTagPick").querySelector(".tag.add"));
+  input(c.w, c.w.document.getElementById("lessonsPosTagInput"), "Diet");
+  click(c.w, c.w.document.getElementById("lessonsPosTagSave"));
+  const onTags = () => [...c.w.document.getElementById("lessonsPosTagPick").querySelectorAll(".tag.on")].map(b => b.textContent);
+  ok(onTags().join(",") === "Good Sleep,Diet", "adding a second tag keeps the first picked too: " + onTags().join(","));
   fill(c, "Pos", { note: "Great night" });
   save(c, "Pos");
-  ok(rows(c.w, "Pos")[0].querySelector(".lessonrow-tag").textContent === "Good Sleep", "lands on the row");
+  const chips = [...rows(c.w, "Pos")[0].querySelectorAll(".lessonrow-tag")].map(e => e.textContent);
+  ok(chips.join(",") === "Good Sleep,Diet", "both land on the row as separate chips: " + chips.join(","));
+  ok(stored(c).positive[0].tags.join(",") === "Good Sleep,Diet", "and both persist on the entry");
 
   openForm(c, "Neg");
   const negTags = [...c.w.document.getElementById("lessonsNegTagPick").children].map(b => b.textContent);
-  ok(negTags.indexOf("Good Sleep") >= 0,
-     "offered on the Negative form too -- one shared, growing vocabulary: " + negTags.join(","));
+  ok(negTags.indexOf("Good Sleep") >= 0 && negTags.indexOf("Diet") >= 0,
+     "both offered on the Negative form too -- one shared, growing vocabulary: " + negTags.join(","));
   const negBtn = [...c.w.document.getElementById("lessonsNegTagPick").children].find(b => b.textContent === "Good Sleep");
   click(c.w, negBtn);
   fill(c, "Neg", { note: "Poor night" });
   save(c, "Neg");
   ok(rows(c.w, "Neg")[0].querySelector(".lessonrow-tag").textContent === "Good Sleep",
      "picking it on the Negative side records it there too, independently");
-  ok(rows(c.w, "Pos")[0].querySelector(".lessonrow-tag").textContent === "Good Sleep",
+  ok([...rows(c.w, "Pos")[0].querySelectorAll(".lessonrow-tag")].map(e => e.textContent).join(",") === "Good Sleep,Diet",
      "without disturbing the Positive entry");
 
   const jar2 = JSON.parse(c.jar["dailyReadout.lessonTags"] || "[]");
-  ok(jar2.indexOf("Good Sleep") >= 0, "and the vocabulary itself is stored, ready for next time");
+  ok(jar2.indexOf("Good Sleep") >= 0 && jar2.indexOf("Diet") >= 0, "and the vocabulary itself is stored, ready for next time");
 }
 
-console.log("\n-- tapping a picked tag again clears the pick --");
+console.log("\n-- tapping a picked tag again drops just that one --");
 {
   const c = open({});
   openView(c);
@@ -154,10 +162,43 @@ console.log("\n-- tapping a picked tag again clears the pick --");
   click(c.w, c.w.document.getElementById("lessonsPosTagPick").querySelector(".tag.add"));
   input(c.w, c.w.document.getElementById("lessonsPosTagInput"), "Diet");
   click(c.w, c.w.document.getElementById("lessonsPosTagSave"));
-  const pick = () => c.w.document.getElementById("lessonsPosTagPick").querySelector(".tag:not(.add)");
-  ok(pick().classList.contains("on"), "picked after adding");
-  click(c.w, pick());
-  ok(!pick().classList.contains("on"), "tapping it again clears the pick");
+  click(c.w, c.w.document.getElementById("lessonsPosTagPick").querySelector(".tag.add"));
+  input(c.w, c.w.document.getElementById("lessonsPosTagInput"), "Exercise");
+  click(c.w, c.w.document.getElementById("lessonsPosTagSave"));
+  const pick = t => [...c.w.document.getElementById("lessonsPosTagPick").children].find(b => b.textContent === t);
+  ok(pick("Diet").classList.contains("on") && pick("Exercise").classList.contains("on"), "both picked after adding");
+  click(c.w, pick("Diet"));
+  ok(!pick("Diet").classList.contains("on"), "tapping Diet again drops it");
+  ok(pick("Exercise").classList.contains("on"), "Exercise stays picked");
+}
+
+console.log("\n-- editing an entry prefills every tag it carries, not just one --");
+{
+  const c = open({});
+  openView(c);
+  openForm(c, "Pos");
+  click(c.w, c.w.document.getElementById("lessonsPosTagPick").querySelector(".tag.add"));
+  input(c.w, c.w.document.getElementById("lessonsPosTagInput"), "Sleep");
+  click(c.w, c.w.document.getElementById("lessonsPosTagSave"));
+  click(c.w, c.w.document.getElementById("lessonsPosTagPick").querySelector(".tag.add"));
+  input(c.w, c.w.document.getElementById("lessonsPosTagInput"), "Mood");
+  click(c.w, c.w.document.getElementById("lessonsPosTagSave"));
+  fill(c, "Pos", { note: "Two tags" });
+  save(c, "Pos");
+  openForm(c, "Pos", rows(c.w, "Pos")[0]);
+  const onTags = [...c.w.document.getElementById("lessonsPosTagPick").querySelectorAll(".tag.on")].map(b => b.textContent);
+  ok(onTags.join(",") === "Sleep,Mood", "reopening the entry re-picks both tags: " + onTags.join(","));
+}
+
+console.log("\n-- an entry saved under the old single-tag shape still reads, migrated on open --");
+{
+  const legacy = { positive: [{ id: "legacy1", date: "2026-01-01", tag: "Old Tag", text: "From before multi-select", _t: 1 }], negative: [] };
+  const c = open({ "dailyReadout.lessons": JSON.stringify(legacy) });
+  openView(c);
+  const chips = [...rows(c.w, "Pos")[0].querySelectorAll(".lessonrow-tag")].map(e => e.textContent);
+  ok(chips.join(",") === "Old Tag", "the old single tag shows as its one chip: " + chips.join(","));
+  ok(stored(c).positive[0].tags && stored(c).positive[0].tags.join(",") === "Old Tag" && stored(c).positive[0].tag === undefined,
+     "and is rewritten to the tags array shape on save");
 }
 
 console.log("\n-- editable: clicking a row reopens it prefilled --");

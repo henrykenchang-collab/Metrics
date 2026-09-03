@@ -146,5 +146,15 @@ console.log("\n-- a marker with a hardcoded start date already has one --");
   ok(trig(c.w, "SAU").textContent === "8/17/26", "and short on the trigger: " + trig(c.w, "SAU").textContent);
 }
 
+console.log("\n-- the panel header labels the start-date column --");
+{
+  const c = open({});
+  const heads = [...c.w.document.querySelectorAll("section.panel .panel-head")]
+    .find(h => h.querySelector(".code").textContent === "Daily Markers");
+  const labels = [...heads.querySelectorAll(".code")].map(e => e.textContent);
+  ok(labels.join(" | ") === "Daily Markers | Start Date | Streak",
+     "Start Date sits between the panel title and Streak: " + labels.join(" | "));
+}
+
 console.log(fail ? "\n" + fail + " FAILED" : "\nall passed");
 process.exit(fail ? 1 : 0);
