@@ -63,28 +63,36 @@ ir.value="-99"; ir.dispatchEvent(new c.w.Event("input",{bubbles:true}));
 ir.dispatchEvent(new c.w.Event("blur",{bubbles:true}));
 ok(store(c).extraIr===-40,"and it clamps at -40");
 
-console.log("\n-- IR gets a visible up/down stepper, since the native one is switched off --");
+console.log("\n-- IR and XR both get a visible up/down stepper, since the native one is switched off --");
 {
   const c2 = open({});
-  const irRow = [...c2.w.document.querySelectorAll("#extras .doserow")]
-    .find(r => r.querySelector(".dose-name").textContent === "Extra/Under IR:");
-  const xrRow = [...c2.w.document.querySelectorAll("#extras .doserow")]
-    .find(r => r.querySelector(".dose-name").textContent === "Extra/Under XR:");
+  const row = label => [...c2.w.document.querySelectorAll("#extras .doserow")]
+    .find(r => r.querySelector(".dose-name").textContent === label);
+  const irRow = row("Extra/Under IR:"), xrRow = row("Extra/Under XR:");
   ok(!!irRow.querySelector(".stepper"), "IR carries the stepper");
-  ok(!xrRow.querySelector(".stepper"), "XR does not");
-  const up = irRow.querySelector(".step-up"), down = irRow.querySelector(".step-down");
+  ok(!!xrRow.querySelector(".stepper"), "and so does XR");
   const click = el => el.dispatchEvent(new c2.w.MouseEvent("click", { bubbles: true }));
+  const up = irRow.querySelector(".step-up"), down = irRow.querySelector(".step-down");
   click(up);
   ok(store(c2).extraIr === 1, "one tap of up steps from nothing to 1: " + store(c2).extraIr);
   click(up); click(up);
   ok(store(c2).extraIr === 3, "and keeps counting: " + store(c2).extraIr);
   click(down);
   ok(store(c2).extraIr === 2, "down steps back: " + store(c2).extraIr);
-  const c3 = open({ "dailyReadout.v1": JSON.stringify({ [TODAY]: { extraIr: 40, _t: 1 } }) });
-  const up3 = [...c3.w.document.querySelectorAll("#extras .doserow")]
-    .find(r => r.querySelector(".dose-name").textContent === "Extra/Under IR:").querySelector(".step-up");
-  up3.dispatchEvent(new c3.w.MouseEvent("click", { bubbles: true }));
-  ok(store(c3).extraIr === 40, "and it clamps at the field's own max: " + store(c3).extraIr);
+  const xrUp = xrRow.querySelector(".step-up"), xrDown = xrRow.querySelector(".step-down");
+  click(xrUp); click(xrUp);
+  ok(store(c2).extraXr === 2, "XR's stepper works independently of IR's: " + store(c2).extraXr);
+  ok(store(c2).extraIr === 2, "and doesn't touch IR's own value: " + store(c2).extraIr);
+  click(xrDown);
+  ok(store(c2).extraXr === 1, "and steps back down too: " + store(c2).extraXr);
+
+  const c3 = open({ "dailyReadout.v1": JSON.stringify({ [TODAY]: { extraIr: 40, extraXr: -40, _t: 1 } }) });
+  const row3 = label => [...c3.w.document.querySelectorAll("#extras .doserow")]
+    .find(r => r.querySelector(".dose-name").textContent === label);
+  row3("Extra/Under IR:").querySelector(".step-up").dispatchEvent(new c3.w.MouseEvent("click", { bubbles: true }));
+  ok(store(c3).extraIr === 40, "IR clamps at its own max: " + store(c3).extraIr);
+  row3("Extra/Under XR:").querySelector(".step-down").dispatchEvent(new c3.w.MouseEvent("click", { bubbles: true }));
+  ok(store(c3).extraXr === -40, "and XR clamps at its own min: " + store(c3).extraXr);
 }
 
 console.log("\n-- the minus stays out of the measured fields --");
