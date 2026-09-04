@@ -33,8 +33,8 @@ ok(/Set a Refill Date/.test(body(c)),"empty state asks for the date: "+body(c).s
 console.log("\n-- counting down from the date --");
 dr.value=back(12); dr.dispatchEvent(new c.w.Event("change",{bubbles:true}));
 ok(store(c).refill===back(12),"the date is stored");
-ok(bars(c).join(" | ")==="IR Supply Left=18/30 | XR Supply Left=48/60",
-   "12 days in: 18 of 30 IR, 48 of 60 XR — "+bars(c).join(" | "));
+ok(bars(c).join(" | ")==="IR Supply Left=18/30 | XR Supply Left=18/30",
+   "12 days in: 18 of 30 for both, now that a refill covers the same span of each — "+bars(c).join(" | "));
 ok(/IR lasts through/.test(body(c))&&/XR/.test(body(c)),"both coverage dates read");
 ok(c.w.document.getElementById("packHead").textContent.indexOf("Refilled")===0,"header names the refill");
 
@@ -47,8 +47,8 @@ console.log("\n-- the edges --");
 c=open({}); const d2=c.w.document.getElementById("refillDate");
 d2.value=back(30); d2.dispatchEvent(new c.w.Event("change",{bubbles:true}));
 ok(bars(c)[0]==="IR Supply Left=0/30","exactly 30 days on: IR is empty");
-ok(bars(c)[1]==="XR Supply Left=30/60","XR still has half");
-ok(/IR is on its last day/.test(body(c)),"the note says it is the last covered day");
+ok(bars(c)[1]==="XR Supply Left=0/30","and, both now covering the same 30 days, XR runs out right alongside it");
+ok(/Both are on their last day/.test(body(c)),"the note says both are, together, rather than singling one out");
 ok(/over/.test(c.w.document.querySelector("#packBody .pack-note").className),"and the panel note flags it");
 ok(!/IR Supply|XR Supply/.test(c.w.document.getElementById("guard").textContent),
    "the top guard no longer repeats it — it lives under Vitamin Supply now");
@@ -58,7 +58,7 @@ ok(bars(c)[0]==="IR Supply Left=5/30","five days left");
 ok(/5 days.*left.*lasts through/i.test(body(c)),"warned before the last covered day, not after");
 c=open({}); const d4=c.w.document.getElementById("refillDate");
 d4.value=TODAY; d4.dispatchEvent(new c.w.Event("change",{bubbles:true}));
-ok(bars(c).join("|")==="IR Supply Left=30/30|XR Supply Left=60/60","refilled today: full");
+ok(bars(c).join("|")==="IR Supply Left=30/30|XR Supply Left=30/30","refilled today: full");
 ok(!/over/.test(c.w.document.querySelector("#packBody .pack-note").className),"nothing to warn about");
 
 console.log("\n-- a later entry corrects an earlier one --");

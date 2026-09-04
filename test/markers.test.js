@@ -129,7 +129,7 @@ const r0=ex.querySelectorAll(".doserow")[0];
 ok(r0.querySelector(".dose-name").textContent==="Extra/Under IR:","label reads 'Extra/Under IR:'");
 ok(r0.querySelector(".dose-unit").textContent==="mg","unit sits after the number");
 const parts=[...r0.children].map(e=>e.className);
-ok(parts.join(">")==="dose-name>dosein>dose-unit","label, then number, then unit, in one row: "+parts.join(" > "));
+ok(parts.join(">")==="dose-name>stepper>dosein>dose-unit","label, then the stepper, then the number, then unit, in one row: "+parts.join(" > "));
 ok(r0.querySelector(".dosein").placeholder==="––","the number field shows a placeholder until filled");
 const inp=r0.querySelector(".dosein");
 inp.value="10"; inp.dispatchEvent(new c.w.Event("input",{bubbles:true}));

@@ -24,7 +24,7 @@ const setDate=(c,v)=>{const e=c.w.document.getElementById("refillDate");
 console.log("\n-- the refill day is a full 30 --");
 let c=open({}); setDate(c,TODAY);
 ok(bars(c)[0]==="30/30","refill today reads 30/30 — today's dose came from the previous refill");
-ok(bars(c)[1]==="60/60","XR likewise");
+ok(bars(c)[1]==="30/30","XR likewise, now that a refill covers 30 days of it too");
 c=open({}); setDate(c,back(1));
 ok(bars(c)[0]==="29/30","one day on: 29");
 c=open({}); setDate(c,back(29));
@@ -62,6 +62,30 @@ ok(store(c).extraIr===15,"positives still work");
 ir.value="-99"; ir.dispatchEvent(new c.w.Event("input",{bubbles:true}));
 ir.dispatchEvent(new c.w.Event("blur",{bubbles:true}));
 ok(store(c).extraIr===-40,"and it clamps at -40");
+
+console.log("\n-- IR gets a visible up/down stepper, since the native one is switched off --");
+{
+  const c2 = open({});
+  const irRow = [...c2.w.document.querySelectorAll("#extras .doserow")]
+    .find(r => r.querySelector(".dose-name").textContent === "Extra/Under IR:");
+  const xrRow = [...c2.w.document.querySelectorAll("#extras .doserow")]
+    .find(r => r.querySelector(".dose-name").textContent === "Extra/Under XR:");
+  ok(!!irRow.querySelector(".stepper"), "IR carries the stepper");
+  ok(!xrRow.querySelector(".stepper"), "XR does not");
+  const up = irRow.querySelector(".step-up"), down = irRow.querySelector(".step-down");
+  const click = el => el.dispatchEvent(new c2.w.MouseEvent("click", { bubbles: true }));
+  click(up);
+  ok(store(c2).extraIr === 1, "one tap of up steps from nothing to 1: " + store(c2).extraIr);
+  click(up); click(up);
+  ok(store(c2).extraIr === 3, "and keeps counting: " + store(c2).extraIr);
+  click(down);
+  ok(store(c2).extraIr === 2, "down steps back: " + store(c2).extraIr);
+  const c3 = open({ "dailyReadout.v1": JSON.stringify({ [TODAY]: { extraIr: 40, _t: 1 } }) });
+  const up3 = [...c3.w.document.querySelectorAll("#extras .doserow")]
+    .find(r => r.querySelector(".dose-name").textContent === "Extra/Under IR:").querySelector(".step-up");
+  up3.dispatchEvent(new c3.w.MouseEvent("click", { bubbles: true }));
+  ok(store(c3).extraIr === 40, "and it clamps at the field's own max: " + store(c3).extraIr);
+}
 
 console.log("\n-- the minus stays out of the measured fields --");
 c=open({});
