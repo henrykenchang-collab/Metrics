@@ -121,32 +121,23 @@ ok(/30 Min/.test(title(c.w,"RDG")),"Sunday still shows the 30-minute target: "+t
 
 console.log("\n-- the dose rows --");
 c=open({});
-const ex=c.w.document.getElementById("extras");
-ok(ex.classList.contains("doses"),"the extras block is a list of rows now");
-ok(ex.querySelectorAll(".doserow").length===2,"two rows");
-ok(!ex.querySelector(".gauge"),"no gauges");
-const r0=ex.querySelectorAll(".doserow")[0];
-ok(r0.querySelector(".dose-name").textContent==="Extra/Under IR:","label reads 'Extra/Under IR:'");
-ok(r0.querySelector(".dose-unit").textContent==="mg","unit sits after the number");
-const parts=[...r0.children].map(e=>e.className);
-ok(parts.join(">")==="dose-name>stepper>dosein>dose-unit","label, then the stepper, then the number, then unit, in one row: "+parts.join(" > "));
-ok(r0.querySelector(".dosein").placeholder==="––","the number field shows a placeholder until filled");
-const inp=r0.querySelector(".dosein");
-inp.value="10"; inp.dispatchEvent(new c.w.Event("input",{bubbles:true}));
-ok(store(c).extraIr===10,"typing still records");
-inp.value="99"; inp.dispatchEvent(new c.w.Event("input",{bubbles:true}));
-inp.dispatchEvent(new c.w.Event("blur",{bubbles:true}));
-ok(store(c).extraIr===40,"and still clamps to the 5-40 range on blur");
-
-console.log("\n-- the supply panel kept its tall cells --");
+ok(!c.w.document.getElementById("extras"),"Daily Markers no longer carries its own dose block");
 const sup=c.w.document.getElementById("supply");
-ok(sup.classList.contains("doses"),"IR Supply now uses the same one-line rows");
-ok(!sup.querySelector(".gauge"),"its gauges are gone with them");
-ok(!/NaN/.test(c.w.document.getElementById("grid").innerHTML),"grid clean");
+ok(sup.classList.contains("doses"),"Vitamin Supply's block is a list of rows");
+ok(sup.querySelectorAll(".doserow").length===3,"three rows: Refill Date, then Extra/Under IR & XR");
+ok(!sup.querySelector(".gauge"),"no gauges");
+const r0=[...sup.querySelectorAll(".doserow")][1];
+ok(r0.querySelector(".dose-name").textContent==="Extra/Under IR:","label reads 'Extra/Under IR:'");
+ok(r0.querySelector(".dose-unit").textContent==="mg","unit sits after the live reading");
+const slider=r0.querySelector(".doseslider");
+ok(!!slider&&slider.type==="range","a range slider, not a typed number field");
+slider.value="10"; slider.dispatchEvent(new c.w.Event("input",{bubbles:true}));
+ok(store(c).extraIr===10,"dragging it still records");
+ok(r0.querySelector(".dose-val").textContent==="+10","and the live reading shows the same value");
 
 console.log("\n-- existing dose history still reads --");
 c=open({"dailyReadout.v1":JSON.stringify({[TODAY]:{extraIr:10,extraXr:15,_t:1}})});
-const vals=[...c.w.document.querySelectorAll("#extras .dosein")].map(i=>i.value);
-ok(vals.join(",")==="10,15","10 and 15 come back into the fields");
+const vals=[...c.w.document.querySelectorAll("#supply .doseslider")].map(i=>i.value);
+ok(vals.join(",")==="10,15","10 and 15 come back into the sliders");
 console.log(fail?"\n"+fail+" FAILED":"\nall passed");
 process.exit(fail?1:0);

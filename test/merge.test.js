@@ -66,7 +66,8 @@ setTimeout(() => {
   ok(w.document.getElementById("bed").value === "21:30", "the bed time is in its field");
   ok(w.document.getElementById("packHead").textContent.indexOf("Refilled") === 0,
      "the supply panel read the refill: " + w.document.getElementById("packHead").textContent);
-  ok(w.document.getElementById("supply").querySelectorAll(".doserow").length === 1, "its one date row rendered");
+  ok(w.document.getElementById("supply").querySelectorAll(".doserow").length === 3,
+     "its date row rendered, alongside the consolidated Extra/Under IR & XR rows");
   ok(!/NaN/.test(w.document.getElementById("grid").innerHTML), "no NaN in the month grid");
 
   try { fs.unlinkSync(OUT); } catch (e) {}

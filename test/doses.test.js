@@ -20,6 +20,7 @@ const bars=c=>[...c.w.document.querySelectorAll("#packBody .pace-row")].map(r=>r
 const note=c=>c.w.document.getElementById("packBody").textContent.replace(/\s+/g," ").trim();
 const setDate=(c,v)=>{const e=c.w.document.getElementById("refillDate");
   e.value=v; e.dispatchEvent(new c.w.Event("change",{bubbles:true}));};
+const slide=(c,el,v)=>{el.value=String(v); el.dispatchEvent(new c.w.Event("input",{bubbles:true}));};
 
 console.log("\n-- the refill day is a full 30 --");
 let c=open({}); setDate(c,TODAY);
@@ -38,61 +39,64 @@ ok(/lasts through/.test(note(c)),'while running, it reads "lasts through": '+not
 console.log("\n-- Taken Today is gone --");
 c=open({});
 ok(!/Taken Today/.test(c.w.document.body.textContent),"the label is nowhere on the page");
-ok(!c.w.document.querySelector("#supply .dosein"),"no number field left in the supply block");
-ok(c.w.document.getElementById("supply").querySelectorAll(".doserow").length===1,"one row: the date");
-ok(!!c.w.document.getElementById("refillDate"),"which is still the date field");
+ok(!c.w.document.querySelector("#supply .dosein"),"no plain number field left in the supply block");
 
-console.log("\n-- Extra/Under --");
-const names=[...c.w.document.querySelectorAll("#extras .dose-name")].map(e=>e.textContent);
-ok(names.join(" | ")==="Extra/Under IR: | Extra/Under XR:","headers read: "+names.join(" | "));
-const ir=c.w.document.querySelectorAll("#extras .dosein")[0];
-// a real number input, not a bare text field, so the up/down spinner and a
-// mouse-wheel scroll while focused both work -- the same reuse of a native
+console.log("\n-- Extra/Under now lives in the Vitamin Supply panel, alongside Refill Date --");
+const names=[...c.w.document.querySelectorAll("#supply .dose-name")].map(e=>e.textContent);
+ok(names.join(" | ")==="Refill Date: | Extra/Under IR: | Extra/Under XR:","one compact block: "+names.join(" | "));
+ok(c.w.document.getElementById("supply").querySelectorAll(".doserow").length===3,"three rows: date, IR, XR");
+const ir=c.w.document.querySelectorAll("#supply .doseslider")[0], xr=c.w.document.querySelectorAll("#supply .doseslider")[1];
+// a native range input, not a bare text field, so it drags with a thumb
+// rather than asking for keyboard precision -- the same reuse of a native
 // control Bed/Wake already get from type="time"
-ok(ir.type==="number","a native number input");
-ok(ir.min==="-40"&&ir.max==="40"&&ir.step==="1","min/max/step match the field's own range");
-ir.value="-20"; ir.dispatchEvent(new c.w.Event("input",{bubbles:true}));
+ok(ir.type==="range","a native range input");
+ok(ir.min==="-30"&&ir.max==="60"&&ir.step==="1","IR's min/max/step match its own range");
+ok(xr.min==="-40"&&xr.max==="40"&&xr.step==="1","XR's min/max/step match its own, independently");
+slide(c,ir,-20);
 ok(store(c).extraIr===-20,"a negative records: "+store(c).extraIr);
-ir.value="-"; ir.dispatchEvent(new c.w.Event("input",{bubbles:true}));
-ok(store(c).extraIr===undefined,"a lone minus is not a number yet, so nothing is stored for it");
-ir.value="-5"; ir.dispatchEvent(new c.w.Event("input",{bubbles:true}));
-ok(store(c).extraIr===-5,"then -5 lands");
-ir.value="15"; ir.dispatchEvent(new c.w.Event("input",{bubbles:true}));
+slide(c,ir,15);
 ok(store(c).extraIr===15,"positives still work");
-ir.value="-99"; ir.dispatchEvent(new c.w.Event("input",{bubbles:true}));
-ir.dispatchEvent(new c.w.Event("blur",{bubbles:true}));
-ok(store(c).extraIr===-40,"and it clamps at -40");
+const readout=r=>r.parentElement.querySelector(".dose-val").textContent;
+ok(readout(ir)==="+15","a positive reading is prefixed with a plus sign: "+readout(ir));
+slide(c,ir,-5);
+ok(readout(ir)==="-5","a negative reading carries its own sign, no double minus: "+readout(ir));
 
-console.log("\n-- IR and XR both get a visible up/down stepper, since the native one is switched off --");
+console.log("\n-- the slider itself enforces the clamp, no separate blur step needed --");
 {
-  const c2 = open({});
-  const row = label => [...c2.w.document.querySelectorAll("#extras .doserow")]
-    .find(r => r.querySelector(".dose-name").textContent === label);
-  const irRow = row("Extra/Under IR:"), xrRow = row("Extra/Under XR:");
-  ok(!!irRow.querySelector(".stepper"), "IR carries the stepper");
-  ok(!!xrRow.querySelector(".stepper"), "and so does XR");
-  const click = el => el.dispatchEvent(new c2.w.MouseEvent("click", { bubbles: true }));
-  const up = irRow.querySelector(".step-up"), down = irRow.querySelector(".step-down");
-  click(up);
-  ok(store(c2).extraIr === 1, "one tap of up steps from nothing to 1: " + store(c2).extraIr);
-  click(up); click(up);
-  ok(store(c2).extraIr === 3, "and keeps counting: " + store(c2).extraIr);
-  click(down);
-  ok(store(c2).extraIr === 2, "down steps back: " + store(c2).extraIr);
-  const xrUp = xrRow.querySelector(".step-up"), xrDown = xrRow.querySelector(".step-down");
-  click(xrUp); click(xrUp);
-  ok(store(c2).extraXr === 2, "XR's stepper works independently of IR's: " + store(c2).extraXr);
-  ok(store(c2).extraIr === 2, "and doesn't touch IR's own value: " + store(c2).extraIr);
-  click(xrDown);
-  ok(store(c2).extraXr === 1, "and steps back down too: " + store(c2).extraXr);
+  const c2=open({});
+  const ir2=c2.w.document.querySelectorAll("#supply .doseslider")[0];
+  ir2.value="999";   // the browser's own range input clamps an out-of-range assignment
+  ok(+ir2.value===60,"assigning past the max clamps to it: "+ir2.value);
+  ir2.value="-999";
+  ok(+ir2.value===-30,"and past the min clamps the other way: "+ir2.value);
+}
 
-  const c3 = open({ "dailyReadout.v1": JSON.stringify({ [TODAY]: { extraIr: 40, extraXr: -40, _t: 1 } }) });
-  const row3 = label => [...c3.w.document.querySelectorAll("#extras .doserow")]
-    .find(r => r.querySelector(".dose-name").textContent === label);
-  row3("Extra/Under IR:").querySelector(".step-up").dispatchEvent(new c3.w.MouseEvent("click", { bubbles: true }));
-  ok(store(c3).extraIr === 40, "IR clamps at its own max: " + store(c3).extraIr);
-  row3("Extra/Under XR:").querySelector(".step-down").dispatchEvent(new c3.w.MouseEvent("click", { bubbles: true }));
-  ok(store(c3).extraXr === -40, "and XR clamps at its own min: " + store(c3).extraXr);
+console.log("\n-- Extra/Under scales what a day draws against supply, per its own baseline dose --");
+{
+  // IR's baseline is 20mg/day: a full extra dose (+20mg) on one of the
+  // twelve elapsed days draws a full extra day; an equal under-dose (-20mg)
+  // draws nothing that day. XR's baseline is 30mg/day, tracked independently.
+  const base = open({"dailyReadout.v1":JSON.stringify({[back(12)]:{refill:back(12),_t:1}})});
+  ok(bars(base).join(" | ")==="18/30 | 18/30","baseline, no extras: 12 days in reads 18/30 for both");
+
+  const plusIr = open({"dailyReadout.v1":JSON.stringify({
+    [back(12)]:{refill:back(12),_t:1}, [back(5)]:{extraIr:20,_t:1}})});
+  ok(bars(plusIr)[0]==="17/30","+20mg IR on one day draws a full extra day of IR: "+bars(plusIr)[0]);
+  ok(bars(plusIr)[1]==="18/30","and never touches XR: "+bars(plusIr)[1]);
+
+  const minusIr = open({"dailyReadout.v1":JSON.stringify({
+    [back(12)]:{refill:back(12),_t:1}, [back(5)]:{extraIr:-20,_t:1}})});
+  ok(bars(minusIr)[0]==="19/30","a full IR under-dose that same day draws none, so a day is given back: "+bars(minusIr)[0]);
+
+  const plusXr = open({"dailyReadout.v1":JSON.stringify({
+    [back(12)]:{refill:back(12),_t:1}, [back(5)]:{extraXr:30,_t:1}})});
+  ok(bars(plusXr)[1]==="17/30","+30mg XR (its own full dose) draws a full extra day of XR: "+bars(plusXr)[1]);
+  ok(bars(plusXr)[0]==="18/30","and never touches IR: "+bars(plusXr)[0]);
+
+  const rested = open({"dailyReadout.v1":JSON.stringify({
+    [back(12)]:{refill:back(12),_t:1}, [back(5)]:{extraIr:40,dailyRest:true,_t:1}})});
+  ok(bars(rested).join(" | ")==="19/30 | 19/30",
+     "Daily Rest excludes the day entirely, regardless of any extra logged that day: "+bars(rested).join(" | "));
 }
 
 console.log("\n-- the minus stays out of the measured fields --");
@@ -104,8 +108,8 @@ ok(store(c).sleep===40,"and stores the positive");
 
 console.log("\n-- export --");
 c=open({});
-const x=c.w.document.querySelectorAll("#extras .dosein")[1];
-x.value="-20"; x.dispatchEvent(new c.w.Event("input",{bubbles:true}));
+const x=c.w.document.querySelectorAll("#supply .doseslider")[1];
+slide(c,x,-20);
 c.w.document.getElementById("copyBtn").dispatchEvent(new c.w.MouseEvent("click",{bubbles:true}));
 setTimeout(()=>{
   const head=copied.split("\n")[0];

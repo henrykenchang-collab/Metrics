@@ -26,7 +26,8 @@ const dr=c.w.document.getElementById("refillDate");
 ok(!!dr,"a Refill Date field exists");
 ok(dr.type==="date","it is a real date input, so phones give a picker");
 ok(dr.closest(".doserow").querySelector(".dose-name").textContent==="Refill Date:","labelled, one line, like the others");
-ok(c.w.document.getElementById("supply").querySelectorAll(".doserow").length===1,"one row: the Refill Date");
+ok(c.w.document.getElementById("supply").querySelectorAll(".doserow").length===3,
+   "three rows now: the date, and Extra/Under IR & XR consolidated in alongside it");
 ok(!c.w.document.querySelector("#supply .dosein[aria-label^='Refill']"),"the old pack-size number field is gone");
 ok(/Set a Refill Date/.test(body(c)),"empty state asks for the date: "+body(c).slice(0,70));
 
