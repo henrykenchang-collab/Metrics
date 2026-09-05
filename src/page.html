@@ -361,6 +361,16 @@
      tighter gap between them than the shared default above. */
   #taglist { gap: 4px; }
   #taglist .tag { font-size: 9.5px; padding: 3px 7px; }
+  /* only a custom Factor (one typed in through "+ New Factor") gets a
+     delete button -- the built-in set is fixed, so there is nothing there
+     to remove */
+  .tag-wrap { display: inline-flex; align-items: center; gap: 2px; }
+  .tag-del {
+    width: 14px; height: 14px; flex: none; border-radius: 50%;
+    display: grid; place-items: center; font-size: 9px; line-height: 1;
+    color: var(--ink-3); background: var(--surface-2);
+  }
+  .tag-del:active { transform: scale(.88); }
   .tagform { display: flex; gap: 7px; }
   .tagform[hidden] { display: none; }
   .taginput {
@@ -493,6 +503,9 @@
   /* Deep/REM/Light only -- their share of the night, alongside the raw figure */
   .stat-pct { font-family: var(--mono); font-size: 9.5px; color: var(--ink-3); }
   .stat-pct:empty { display: none; }
+  /* Deep and REM's share of the night, read against a stated floor */
+  .stat-pct.band-good { color: var(--good); }
+  .stat-pct.band-bad  { color: var(--neg); }
   .gauge { height: 3px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
   .gauge > i { display: block; height: 100%; width: 0; background: var(--violet); border-radius: 2px; transition: width .3s cubic-bezier(.2,.7,.3,1); }
 
@@ -921,7 +934,7 @@
   </section>
 
   <section class="panel" id="vitaminSupply">
-    <div class="panel-head"><span class="code">Vitamin Supply</span><span class="code" id="packHead">No Pack</span></div>
+    <div class="panel-head"><span class="code mkr-head">Vitamin Supply<button class="excuse" id="dailyRest" type="button" aria-pressed="false">Daily Rest</button></span><span class="code" id="packHead">No Pack</span></div>
     <div class="doses tight" id="supply"></div>
     <div id="packBody"></div>
   </section>
@@ -1122,8 +1135,10 @@
      the raw figure, so "33 min" also reads as "8% of the night". */
   var STATS2 = [
     { key: "avgHr",      label: "Average Resting Heart Rate", short: "Avg HR", min: 35, max: 125, unit: "bpm" },
-    { key: "deepSleep",  label: "Deep Sleep",                 short: "Deep",   min: 0,  max: 300, unit: "min", pctOfBed: true },
-    { key: "remSleep",   label: "REM Sleep",                  short: "REM",    min: 0,  max: 300, unit: "min", pctOfBed: true },
+    { key: "deepSleep",  label: "Deep Sleep",                 short: "Deep",   min: 0,  max: 300, unit: "min", pctOfBed: true,
+      pctBand: function (p) { return p < 10 ? "bad" : "good"; } },
+    { key: "remSleep",   label: "REM Sleep",                  short: "REM",    min: 0,  max: 10,  unit: "h", len: 4, decimal: true, pctOfBed: true, toMinutes: function (v) { return v * 60; },
+      pctBand: function (p) { return p < 15 ? "bad" : "good"; } },
     { key: "lightSleep", label: "Light Sleep",                short: "Light",  min: 0,  max: 10,  unit: "h", len: 4, decimal: true, pctOfBed: true, toMinutes: function (v) { return v * 60; } }
   ];
 
@@ -1132,7 +1147,7 @@
   var EXTRAS = [
     /* signed: a negative is a dose skipped, so the field reads as net
        deviation from the usual rather than as an amount taken */
-    { key: "extraIr", code: "IR", label: "Extra/Under IR", min: -40, max: 40, unit: "mg" },
+    { key: "extraIr", code: "IR", label: "Extra/Under IR", min: -30, max: 60, unit: "mg" },
     { key: "extraXr", code: "XR", label: "Extra/Under XR", min: -40, max: 40, unit: "mg" }
   ];
 
@@ -1235,7 +1250,7 @@
     { v: "sleep",       label: "Sleep",      dp: 0, unit: "pts" },
     { v: "avgHr",       label: "Avg HR",     dp: 0, unit: "bpm" },
     { v: "deepSleep",   label: "Deep Sleep", dp: 0, unit: "min" },
-    { v: "remSleep",    label: "REM Sleep",  dp: 0, unit: "min" },
+    { v: "remSleep",    label: "REM Sleep",  dp: 1, unit: "h" },
     { v: "lightSleep",  label: "Light Sleep",dp: 1, unit: "h" }
   ];
   var TIMINGS = [{ v: 0, label: "Same Day" }, { v: 1, label: "Next Day" }];
@@ -1265,7 +1280,7 @@
       get: function (d) { return d.avgHr === undefined ? null : d.avgHr; } },
     { label: "Deep Sleep",             dp: 0, unit: " min", move: 10,  good: "up",
       get: function (d) { return d.deepSleep === undefined ? null : d.deepSleep; } },
-    { label: "REM Sleep",              dp: 0, unit: " min", move: 15,  good: "up",
+    { label: "REM Sleep",              dp: 1, unit: " h",   move: 0.25, good: "up",
       get: function (d) { return d.remSleep === undefined ? null : d.remSleep; } },
     /* Light sleep is the stage least clearly "good" either direction, since a
        rise can mean either more total sleep (fine) or the same night growing
@@ -1695,6 +1710,10 @@
       d.lightSleep = Math.round(d.lightSleep / 60 * 10) / 10;
       migrated = true;
     }
+    if (typeof d.remSleep === "number" && d.remSleep > 24) {
+      d.remSleep = Math.round(d.remSleep / 60 * 10) / 10;
+      migrated = true;
+    }
 
     if (d.tags && d.tags.length) {
       var out = [], seen = {};
@@ -1810,6 +1829,15 @@
     });
   })();
 
+  /* Daily Rest: a day IR/XR were not used, so it should not draw down the
+     supply -- same shape as the PTO toggle, just scoped to the doses. */
+  $("dailyRest").addEventListener("click", function (e) {
+    e.stopPropagation();                 // this is not folding the panel
+    var d = day(cur);
+    if (d.dailyRest) delete d.dailyRest; else d.dailyRest = true;
+    save(cur); render();
+  });
+
   /* `compact` renders a dose as one line — "Extra IR: 10 mg" — at the size of
      a marker row. A tall cell with a 23px number and a gauge was more furniture
      than a milligram figure needs, and it sat next to eleven one-line markers.
@@ -1906,10 +1934,14 @@
      there is nothing to divide by, same as the gauge and band. */
   function paintPct(s, el, v, d) {
     if (!el) return;                          // only Deep/REM/Light carry one
+    el.classList.remove("band-good", "band-bad");
     var mins = inBed((d && d.bed) || SLEEP_DEFAULT.bed, (d && d.wake) || SLEEP_DEFAULT.wake);
     if (v === null || v === undefined || !mins) { el.textContent = ""; return; }
     var own = s.toMinutes ? s.toMinutes(v) : v;
-    el.textContent = Math.round(own / mins * 100) + "%";
+    var pct = Math.round(own / mins * 100);
+    el.textContent = pct + "%";
+    // Deep and REM read against a stated share of the night; Light carries none
+    if (s.pctBand) el.classList.add("band-" + s.pctBand(pct));
   }
 
   function paintGauge(s, fill, v) {
@@ -2371,6 +2403,7 @@
     var on = (data[cur] || {}).tags || [];
     var host = $("taglist");
     host.innerHTML = "";
+    var customLow = customTags.map(function (t) { return t.toLowerCase(); });
     allTags().forEach(function (t) {
       var b = document.createElement("button");
       b.className = "tag" + (on.indexOf(t) >= 0 ? " on" : "");
@@ -2385,7 +2418,26 @@
         save(cur);
         renderTags(); renderPatterns();
       });
-      host.appendChild(b);
+      // only a custom Factor (typed in, not one of the built-in BASE_TAGS)
+      // can be removed -- the built-in set is fixed
+      if (customLow.indexOf(t.toLowerCase()) >= 0) {
+        var wrap = document.createElement("span");
+        wrap.className = "tag-wrap";
+        wrap.appendChild(b);
+        var del = document.createElement("button");
+        del.type = "button"; del.className = "tag-del"; del.textContent = "×";
+        del.setAttribute("aria-label", "Remove " + t + " from Factors");
+        del.addEventListener("click", function (e) {
+          e.stopPropagation();                 // removing it is not toggling it
+          var i = customTags.map(function (c) { return c.toLowerCase(); }).indexOf(t.toLowerCase());
+          if (i >= 0) { customTags.splice(i, 1); saveTags(); schedulePush(); }
+          renderTags(); renderPatterns();
+        });
+        wrap.appendChild(del);
+        host.appendChild(wrap);
+      } else {
+        host.appendChild(b);
+      }
     });
     var add = document.createElement("button");
     add.className = "tag add"; add.type = "button"; add.textContent = "+ New Factor";
@@ -2590,7 +2642,14 @@
     });
     if (!start) return null;
 
-    var gone = Math.max(0, dayGap(start, today));   // a future date is not negative supply
+    /* Daily Rest: a day IR/XR genuinely were not taken, so it does not draw
+       down the supply -- excluded from the elapsed count entirely, the same
+       way PTO excuses a marker rather than counting it as a miss. */
+    var gone = 0, k = start;
+    while (k < today) {
+      if (!(data[k] && data[k].dailyRest)) gone++;
+      k = shift(k, 1);
+    }
     function run(span) {
       return { left: Math.max(0, Math.min(span, span - gone)), span: span, out: shift(start, span) };
     }
@@ -2869,6 +2928,7 @@
     $("todayBtn").hidden = isToday;
     $("next").disabled = isToday;
     $("markerPto").setAttribute("aria-pressed", d.pto ? "true" : "false");
+    $("dailyRest").setAttribute("aria-pressed", d.dailyRest ? "true" : "false");
 
     var dueRows = [], notDueRows = [];
     MARKERS.forEach(function (m) {
@@ -3673,7 +3733,12 @@
       if (j <= k && data[j] && data[j].refill) start = data[j].refill;
     });
     if (!start) return "";
-    return Math.max(0, Math.min(span, span - Math.max(0, dayGap(start, k))));
+    var gone = 0, j = start;
+    while (j < k) {
+      if (!(data[j] && data[j].dailyRest)) gone++;
+      j = shift(j, 1);
+    }
+    return Math.max(0, Math.min(span, span - gone));
   }
 
   function csv() {
