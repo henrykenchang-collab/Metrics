@@ -52,11 +52,11 @@ console.log("\n-- actually hidden, not just marked hidden --");
   // `[hidden]` rule restating it, or jsdom's `.hidden === true` above
   // would be true while a real browser renders the view anyway, stacked
   // right under the daily view it was supposed to replace.
+  // the rule may list further views alongside these two, so match any rule
+  // whose selector list carries the id rather than pinning the exact pair
   const css = HTML.replace(/\s+/g, " ");
-  ok(/#chartsView\[hidden\], ?#lessonsView\[hidden\] \{[^}]*display: none/.test(css) ||
-     (/#chartsView\[hidden\][^{,]*\{[^}]*display: none/.test(css) &&
-      /#lessonsView\[hidden\][^{,]*\{[^}]*display: none/.test(css)),
-     "both carry an explicit [hidden] rule");
+  const hiddenRule = id => new RegExp("(^|\\}|,)[^{}]*#" + id + "\\[hidden\\][^{}]*\\{[^}]*display: none").test(css);
+  ok(hiddenRule("chartsView") && hiddenRule("lessonsView"), "both carry an explicit [hidden] rule");
 }
 
 console.log("\n-- opening it: no per-day framing left --");

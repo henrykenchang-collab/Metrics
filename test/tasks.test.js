@@ -1,8 +1,7 @@
-/* Task Reminders sits above Guardrails, same fold shape, but its own
-   content: a fixed list due on the 1st of every month, nothing tied to a
-   marker or a streak. Guards both dates (due vs. not), that it folds and
-   remembers independently of Guardrails, and that it never bleeds into
-   the log. */
+/* Task Reminders: a fixed set of monthly to-dos, each due the 1st and
+   staying due until it is ticked. Guards the tick surviving a reload, the
+   month boundary bringing a task back, an untick putting it back on the
+   list, and the panel being absent -- not empty -- once nothing is due. */
 const fs = require("fs"), { JSDOM } = require("jsdom");
 const HTML = fs.readFileSync("/home/user/Metrics/daily-readout.html", "utf8");
 let fail = 0; const ok = (c, m) => { console.log((c ? "  PASS  " : "  FAIL  ") + m); if (!c) fail++; };
@@ -26,39 +25,84 @@ function openPinned(dateStr, jar) {
      } }).window;
   return { w, jar };
 }
-const tasks = w => w.document.getElementById("tasks");
-const tHead = w => tasks(w).querySelector(".guard-head");
-const tBody = w => tasks(w).querySelector(".guard-body");
+const panel = w => w.document.getElementById("tasks");
+const list  = w => w.document.getElementById("taskList");
+const names = el => [...el.querySelectorAll(".taskrow")].map(r => r.querySelector(".alert-name").textContent);
+const done  = el => [...el.querySelectorAll(".taskrow.done")].map(r => r.querySelector(".alert-name").textContent);
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
 
-console.log("\n-- not the 1st: quiet --");
-let c = openPinned("2026-09-05");
-ok(/Task Reminders/.test(tHead(c.w).textContent), "the panel has its own head");
-ok(/Not Due/.test(tHead(c.w).textContent), "counts nothing: " + tHead(c.w).textContent.trim());
-ok(!!tBody(c.w).querySelector(".guard-clear"), "and reads as all-clear");
-ok(!tasks(c.w).classList.contains("alert"), "no alert border either");
+console.log("\n-- the link sits under Lessons Learned --");
+let c = openPinned("2026-09-16");
+const links = [...c.w.document.querySelectorAll(".viewlinks .viewlink")].map(b => b.textContent.trim());
+ok(links.indexOf("Task Reminders →") === links.indexOf("Lessons Learned →") + 1,
+   "in order: " + links.join(" | "));
 
-console.log("\n-- the 1st: all three come due --");
-let f = openPinned("2026-10-01");
-ok(/3 Due/.test(tHead(f.w).textContent), "counts three: " + tHead(f.w).textContent.trim());
-ok(tasks(f.w).classList.contains("alert"), "and reads as an alert, same as a flagged Guardrails");
-const rows = [...tBody(f.w).querySelectorAll(".alert-row")].map(r => r.querySelector(".alert-name").textContent);
-ok(rows.join(" | ") === "Shanti Heartworm | CPAP Clean | Expresso Clean",
-   "the three tasks, in order: " + rows.join(" | "));
+console.log("\n-- due mid-month, not just on the 1st --");
+ok(panel(c.w).hidden === false, "the panel shows on the 16th, because nothing has been ticked");
+ok(/3 Due/.test(panel(c.w).querySelector(".guard-head").textContent), "counting all three");
+ok(names(panel(c.w)).join(" | ") === "Shanti Heartworm | Clean CPAP | Clean Expresso Machine",
+   "the three tasks: " + names(panel(c.w)).join(" | "));
 
-console.log("\n-- it folds, independently of Guardrails --");
-ok(tBody(f.w).hidden === false, "open to begin with");
-click(f.w, tHead(f.w));
-ok(tBody(f.w).hidden === true, "a click shuts it");
-ok(tHead(f.w).classList.contains("shut"), "the head marks itself shut");
-const guardBody = f.w.document.getElementById("guard").querySelector(".guard-body");
-ok(guardBody.hidden === false, "Guardrails' own fold is untouched");
+console.log("\n-- the page lists them too --");
+click(c.w, c.w.document.getElementById("tasksLink"));
+ok(c.w.document.getElementById("dailyView").hidden === true, "the daily view stands aside");
+ok(c.w.document.getElementById("tasksView").hidden === false, "and the page opens");
+ok(names(list(c.w)).length === 3, "all three listed, due or not");
 
-console.log("\n-- remembered, alongside the other panels, never in the log --");
-ok(JSON.parse(f.jar["dailyReadout.shut"]).indexOf("tasks") >= 0, "the choice is stored beside the panels'");
-ok(!f.jar["dailyReadout.v1"] || !/"tasks"/.test(f.jar["dailyReadout.v1"]), "and never into the log");
-const back = openPinned("2026-10-01", f.jar);
-ok(tBody(back.w).hidden === true, "shut again on the next load");
+console.log("\n-- ticking from the page --");
+click(c.w, list(c.w).querySelectorAll(".taskrow")[0]);
+ok(done(list(c.w)).join("") === "Shanti Heartworm", "the row marks itself done");
+ok(/2 Due/.test(c.w.document.getElementById("tasksN").textContent), "and the count drops");
+ok(JSON.parse(c.jar["dailyReadout.tasks"])["shantiHeartworm:2026-09"].done === true,
+   "stored per task per month");
+ok(!c.jar["dailyReadout.v1"] || !/shantiHeartworm/.test(c.jar["dailyReadout.v1"]),
+   "and never into the day log");
+
+console.log("\n-- ticking the rest empties the panel entirely --");
+[...list(c.w).querySelectorAll(".taskrow")].forEach(r => { if (!r.classList.contains("done")) click(c.w, r); });
+ok(c.w.document.getElementById("tasksN").textContent === "All Done", "the page says so");
+click(c.w, c.w.document.getElementById("backFromTasks"));
+ok(panel(c.w).hidden === true, "the panel is gone, not showing an all-clear line");
+ok(panel(c.w).innerHTML === "", "and carries no markup to render");
+
+console.log("\n-- it stays gone for the rest of the month, and comes back the next --");
+ok(openPinned("2026-09-30", c.jar).w.document.getElementById("tasks").hidden === true, "still gone on the 30th");
+const oct = openPinned("2026-10-01", c.jar);
+ok(oct.w.document.getElementById("tasks").hidden === false, "back on October 1st");
+ok(names(panel(oct.w)).length === 3, "all three due again");
+
+console.log("\n-- ticking from the panel itself --");
+click(oct.w, panel(oct.w).querySelector(".taskrow"));
+ok(names(panel(oct.w)).join(" | ") === "Clean CPAP | Clean Expresso Machine",
+   "the ticked one drops off: " + names(panel(oct.w)).join(" | "));
+
+console.log("\n-- an untick puts it back, and records that it did --");
+const back = openPinned("2026-10-02", oct.jar);
+click(back.w, back.w.document.getElementById("tasksLink"));
+click(back.w, list(back.w).querySelector(".taskrow.done"));
+ok(names(panel(back.w)).length === 3, "due again once unticked");
+ok(JSON.parse(back.jar["dailyReadout.tasks"])["shantiHeartworm:2026-10"].done === false,
+   "stored as false rather than deleted, so the untick survives a merge");
+
+console.log("\n-- the page's history line --");
+const nov = openPinned("2026-11-03", oct.jar);
+click(nov.w, nov.w.document.getElementById("tasksLink"));
+const detail = [...list(nov.w).querySelectorAll(".taskrow")]
+  .map(r => r.querySelector(".alert-detail").textContent);
+// all three were ticked back in September, so all three carry that history
+ok(detail.every(d => /last done Sep 2026/.test(d)),
+   "names the month last ticked, with a four-digit year: " + detail[0]);
+// a task never ticked has nothing to name
+const fresh = openPinned("2026-11-03");
+click(fresh.w, fresh.w.document.getElementById("tasksLink"));
+ok([...list(fresh.w).querySelectorAll(".taskrow")]
+     .every(r => /not done yet/.test(r.querySelector(".alert-detail").textContent)),
+   "and says so when there is no history");
+
+console.log("\n-- the view hides itself properly --");
+const css = HTML.replace(/\s+/g, " ");
+ok(new RegExp("(^|\\}|,)[^{}]*#tasksView\\[hidden\\][^{}]*\\{[^}]*display: none").test(css),
+   "#tasksView carries its own [hidden] rule, like the other views");
 
 console.log(fail ? "\n" + fail + " FAILED" : "\nall passed");
 process.exit(fail ? 1 : 0);
