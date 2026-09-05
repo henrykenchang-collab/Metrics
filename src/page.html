@@ -3206,16 +3206,19 @@
       var dueDays = dates.filter(function (k) { return k <= today && isDue(m, k); }).length;
       possible += dueDays;
       html += line(m.code, null, "on", function (d, k) {
-        var done = !!d[m.key];
+        var done = !!d[m.key], ok = onTrack(m, k);
         if (!isDue(m, k)) {
-          if (done) return { op: .5, t: "done, off schedule", cls: "on" };
+          if (done) return { op: .5, t: (ok ? "done" : "logged") + ", off schedule", cls: ok ? "on" : "gap" };
           if (d.pto) return { pto: true, t: "PTO" };
           return { na: true };
         }
-        if (done) { hit++; return { op: 1, t: "done", n: 1 }; }
-        /* Red means you logged the day and this was not done. A day with
+        /* For an `invert` marker (TH, YT), being on track means NOT having
+           checked it -- checking it is the lapse, so it reads red here the
+           same way missing an ordinary marker does. */
+        if (ok) { hit++; return { op: 1, t: m.invert ? "avoided" : "done", n: 1 }; }
+        /* Red means you logged the day and this was off track. A day with
            nothing on it stays blank: not opening the app is not a miss. */
-        if (logged(d)) return { op: 1, t: "missed", cls: "gap" };
+        if (logged(d)) return { op: 1, t: m.invert ? "logged" : "missed", cls: "gap" };
         return null;
       }, function (v) { return dueDays ? v.length + "/" + dueDays : ""; });
     });
