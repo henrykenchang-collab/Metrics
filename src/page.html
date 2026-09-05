@@ -1279,17 +1279,9 @@
       get: function (d) { return d.hr === undefined ? null : d.hr; } },
     { label: "Average Resting Heart Rate", dp: 0, unit: " bpm", move: 4,  good: "down",
       get: function (d) { return d.avgHr === undefined ? null : d.avgHr; } },
-    { label: "Deep Sleep",             dp: 0, unit: " min", move: 10,  good: "up",
-      get: function (d) { return d.deepSleep === undefined ? null : d.deepSleep; } },
-    { label: "REM Sleep",              dp: 1, unit: " h",   move: 0.25, good: "up",
-      get: function (d) { return d.remSleep === undefined ? null : d.remSleep; } },
-    /* Light sleep is the stage least clearly "good" either direction, since a
-       rise can mean either more total sleep (fine) or the same night growing
-       lighter and less restorative (not). Coded as a fall being the flag, on
-       the same logic as the others: a shift is worth a look either way, and
-       this is the direction more often reported as the concerning one. */
-    { label: "Light Sleep",            dp: 1, unit: " h",   move: 0.5, good: "down",
-      get: function (d) { return d.lightSleep === undefined ? null : d.lightSleep; } },
+    /* Deep, REM and Light sleep are not guardrail material -- their own
+       percent-of-night bands (see pctBand on STATS2, and Trend Charts for
+       the shape over time) already say what needs saying about them. */
     /* Doses read as average mg per logged day, so a rise catches taking the
        same amount more often as well as taking more at a time. Days with none
        count as 0; the flag stays quiet until there are a few real doses. */
@@ -1911,7 +1903,7 @@
       save(cur);
       paintGauge(s, fill, blank ? null : +clean);
       paintBand(s, input, blank ? null : +clean);
-      paintPct(s, pct, blank ? null : +clean, d);
+      paintPct(s, pct, input, blank ? null : +clean, d);
       renderSummary();
       renderSupply();          // the pack reads from these very fields
     });
@@ -1922,7 +1914,7 @@
         if (v !== d[s.key]) { d[s.key] = v; input.value = v; save(cur); toast(s.label + " clamped to " + s.min + "–" + s.max); }
         paintGauge(s, fill, v);
         paintBand(s, input, v);
-        paintPct(s, pct, v, d);
+        paintPct(s, pct, input, v, d);
       }
       renderSummary(); renderSupply(); renderGrid(); renderPatterns(); renderGuard();
     });
@@ -1934,16 +1926,24 @@
   /* the share of the night a sleep stage took up, alongside its own raw
      figure -- "33 min" also reads as "8% of the night". Blank whenever
      there is nothing to divide by, same as the gauge and band. */
-  function paintPct(s, el, v, d) {
+  function paintPct(s, el, input, v, d) {
     if (!el) return;                          // only Deep/REM/Light carry one
     el.classList.remove("band-good", "band-bad");
+    if (input) input.classList.remove("band-good", "band-bad");
     var mins = inBed((d && d.bed) || SLEEP_DEFAULT.bed, (d && d.wake) || SLEEP_DEFAULT.wake);
     if (v === null || v === undefined || !mins) { el.textContent = ""; return; }
     var own = s.toMinutes ? s.toMinutes(v) : v;
     var pct = Math.round(own / mins * 100);
     el.textContent = pct + "%";
-    // Deep and REM read against a stated share of the night; Light carries none
-    if (s.pctBand) el.classList.add("band-" + s.pctBand(pct));
+    // Deep and REM read against a stated share of the night; Light carries
+    // none. The same color lands on the raw min/hr figure too, right next
+    // to it, so an out-of-range share doesn't read as a color only the
+    // small percentage carries.
+    if (s.pctBand) {
+      var band = s.pctBand(pct);
+      el.classList.add("band-" + band);
+      if (input) input.classList.add("band-" + band);
+    }
   }
 
   function paintGauge(s, fill, v) {
@@ -3000,7 +3000,7 @@
       n.input.value = (v === undefined || v === null) ? "" : v;
       paintGauge(s, n.fill, v === undefined ? null : v);
       paintBand(s, n.input, v === undefined ? null : v);
-      paintPct(s, n.pct, v === undefined ? null : v, d);
+      paintPct(s, n.pct, n.input, v === undefined ? null : v, d);
     });
     EXTRAS.forEach(function (s) {
       var n = statNodes[s.key], v = d[s.key];
