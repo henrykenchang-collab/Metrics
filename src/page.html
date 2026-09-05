@@ -188,7 +188,15 @@
     font-size: 11px; color: var(--ink-2); background: var(--surface-2);
     border-radius: 999px; padding: 2px 9px; white-space: nowrap;
   }
+  /* title and note stack in one column so the date and tags beside them
+     stay on the grid, rather than each entry becoming two rows deep */
+  .lessonrow-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .lessonrow-title { font-size: 13.5px; font-weight: 600; letter-spacing: -.01em; color: var(--ink); line-height: 1.35; word-break: break-word; }
   .lessonrow-text { font-size: 13.5px; color: var(--ink); line-height: 1.4; word-break: break-word; }
+  /* under a title the note is the supporting line, not the headline -- an
+     entry with no title keeps the note at full weight, since then it is
+     the only thing there is to read */
+  .lessonrow-title + .lessonrow-text { font-size: 12.5px; color: var(--ink-2); }
   .lessonrow-del {
     width: 22px; height: 22px; flex: none; border-radius: 6px;
     color: var(--ink-3); background: var(--surface-2);
@@ -202,6 +210,13 @@
   .lessonform .tagwrap { padding: 0; }
   .lessonfield { display: flex; flex-direction: column; gap: 3px; }
   .lessonfield > .code { color: var(--ink-3); font-size: 11px; }
+  .lessontitle {
+    font: inherit; font-size: 13.5px; width: 100%; padding: 6px 9px; color: var(--ink);
+    background: var(--surface-2); border: 1px solid transparent; border-radius: 8px;
+    -webkit-appearance: none; appearance: none;
+  }
+  .lessontitle::placeholder { color: var(--ink-3); }
+  .lessontitle:focus { border-color: var(--accent); }
   .lessondate {
     font: 13px var(--mono); color: var(--ink); background: var(--surface-2);
     border: 1px solid transparent; border-radius: 8px; padding: 6px 9px;
@@ -363,6 +378,9 @@
   .taskrow.done .taskbox { background: var(--accent); border-color: var(--accent); }
   .taskrow.done .taskbox svg { opacity: 1; transform: scale(1); }
   .taskrow.done .alert-name { color: var(--ink-3); }
+  /* before the schedule starts: still listed, so you can see what is coming,
+     but plainly not yet yours to tick */
+  .taskrow[disabled] { cursor: default; opacity: .5; }
   /* On the readout every due row carries the same one fact, so it rides
      beside the name rather than under it -- three stacked lines of "Due the
      1st" is three lines of the readout spent saying one thing three times.
@@ -1095,6 +1113,8 @@
     <div class="lessonlist" id="lessonsPosList"></div>
     <div class="lessonadd"><button class="tag add" id="lessonsPosAddBtn" type="button">+ Add</button></div>
     <div class="lessonform" id="lessonsPosForm" hidden>
+      <label class="lessonfield"><span class="code">Title</span>
+        <input class="lessontitle" type="text" id="lessonsPosTitle" maxlength="70" placeholder="What worked, in a few words" aria-label="Title"></label>
       <label class="lessonfield"><span class="code">Date</span>
         <input class="lessondate" type="date" id="lessonsPosDate" aria-label="Date"></label>
       <div class="tagwrap">
@@ -1117,6 +1137,8 @@
     <div class="lessonlist" id="lessonsNegList"></div>
     <div class="lessonadd"><button class="tag add" id="lessonsNegAddBtn" type="button">+ Add</button></div>
     <div class="lessonform" id="lessonsNegForm" hidden>
+      <label class="lessonfield"><span class="code">Title</span>
+        <input class="lessontitle" type="text" id="lessonsNegTitle" maxlength="70" placeholder="What went wrong, in a few words" aria-label="Title"></label>
       <label class="lessonfield"><span class="code">Date</span>
         <input class="lessondate" type="date" id="lessonsNegDate" aria-label="Date"></label>
       <div class="tagwrap">
@@ -3097,6 +3119,13 @@
     { key: "cpapClean",       name: "Clean CPAP" },
     { key: "espressoClean",   name: "Clean Expresso Machine" }
   ];
+  /* The schedule these belong to starts on the 1st of October 2026, so
+     nothing before then is due, counted, or tickable -- a reminder shown as
+     overdue for months it was never meant to cover is noise, and a tick
+     banked against one of those months would count for nothing. */
+  var TASK_SINCE = "2026-10-01";
+  function tasksStarted() { return todayISO() >= TASK_SINCE; }
+  function taskStartLabel() { return "Starts " + monthLabel(TASK_SINCE.slice(0, 7)); }
   var TASK_TICK = '<span class="taskbox"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.2" ' +
     'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.2 5.2L20 7"/></svg></span>';
 
@@ -3123,13 +3152,15 @@
     return best;
   }
   function dueTasks() {
+    if (!tasksStarted()) return [];
     var p = taskPeriod(todayISO());
     return TASK_REMINDERS.filter(function (t) { return !taskIsDone(t, p); });
   }
 
-  function taskRow(t, p, detail, tight) {
-    return '<button class="taskrow' + (taskIsDone(t, p) ? " done" : "") + (tight ? " tight" : "") +
-             '" type="button" data-task="' + t.key + '" ' +
+  function taskRow(t, p, detail, o) {
+    o = o || {};
+    return '<button class="taskrow' + (taskIsDone(t, p) ? " done" : "") + (o.tight ? " tight" : "") +
+             '" type="button" data-task="' + t.key + '"' + (o.locked ? " disabled" : "") + ' ' +
              'aria-pressed="' + (taskIsDone(t, p) ? "true" : "false") + '">' + TASK_TICK +
              '<span class="alert-body"><span class="alert-name">' + esc(t.name) + '</span>' +
              '<span class="alert-detail">' + detail + '</span></span></button>';
@@ -3160,7 +3191,7 @@
                  '<span class="code n">' + due.length + " Due" + '</span>' +
                CHEV + '</div>' +
              '<div class="guard-body">';
-    due.forEach(function (t) { html += taskRow(t, p, "Due the 1st", true); });
+    due.forEach(function (t) { html += taskRow(t, p, "Due the 1st", { tight: true }); });
     html += '</div>';
     host.innerHTML = html;
     wireFold(host, "tasks");
@@ -3168,18 +3199,22 @@
   }
 
   function renderTaskList() {
-    var host = $("taskList"), p = taskPeriod(todayISO()), left = dueTasks().length;
-    $("tasksN").textContent = left ? left + " Due" : "All Done";
+    var host = $("taskList"), p = taskPeriod(todayISO()), started = tasksStarted();
+    var left = dueTasks().length;
+    $("tasksN").textContent = !started ? taskStartLabel() : left ? left + " Due" : "All Done";
     var html = "";
     TASK_REMINDERS.forEach(function (t) {
       var last = taskLastDone(t), detail;
-      if (taskIsDone(t, p)) detail = "Done this month.";
+      // the head already carries both halves -- "Due the 1st of every
+      // month" beside "Starts Oct 2026" -- so the row only needs the once
+      if (!started) detail = taskStartLabel();
+      else if (taskIsDone(t, p)) detail = "Done this month.";
       else detail = last ? "Due now — last done " + esc(monthLabel(last)) + "."
                          : "Due now — not done yet.";
-      html += taskRow(t, p, detail);
+      html += taskRow(t, p, detail, { locked: !started });
     });
     host.innerHTML = html;
-    wireTaskRows(host, p);
+    if (started) wireTaskRows(host, p);      // nothing to tick before it starts
   }
 
   /* Re-wired on every render, because both panels replace their own markup */
@@ -3971,7 +4006,10 @@
       '<span class="lessonrow-tags">' +
         (entry.tags || []).map(function (t) { return '<span class="lessonrow-tag">' + esc(t) + '</span>'; }).join("") +
       '</span>' +
-      '<span class="lessonrow-text">' + esc(entry.text) + '</span>' +
+      '<span class="lessonrow-body">' +
+        (entry.title ? '<span class="lessonrow-title">' + esc(entry.title) + '</span>' : "") +
+        '<span class="lessonrow-text">' + esc(entry.text) + '</span>' +
+      '</span>' +
       '<button class="lessonrow-del" type="button" aria-label="Delete this entry">×</button>';
     row.addEventListener("click", function () { openLessonForm(p, entry); });
     row.querySelector(".lessonrow-del").addEventListener("click", function (e) {
@@ -4030,12 +4068,13 @@
   function openLessonForm(p, entry) {
     lessonEditing[p] = entry ? entry.id : null;
     lessonPickedTags[p] = entry ? (entry.tags || []).slice() : [];
+    $("lessons" + p + "Title").value = entry ? (entry.title || "") : "";
     $("lessons" + p + "Date").value = entry ? entry.date : todayISO();
     $("lessons" + p + "Note").value = entry ? entry.text : "";
     $("lessons" + p + "TagForm").hidden = true;
     renderLessonTagPick(p);
     $("lessons" + p + "Form").hidden = false;
-    $("lessons" + p + "Note").focus();
+    $("lessons" + p + "Title").focus();       // the top of the form, not the middle
   }
 
   function closeLessonForm(p) {
@@ -4049,6 +4088,7 @@
     var list = lessonList(p), id = lessonEditing[p];
     var entry = id ? list.filter(function (e) { return e.id === id; })[0] : null;
     if (!entry) { entry = { id: newLessonId() }; list.push(entry); }
+    entry.title = $("lessons" + p + "Title").value.trim();
     entry.date = $("lessons" + p + "Date").value || todayISO();
     entry.tags = lessonPickedTags[p].slice();
     entry.text = text;

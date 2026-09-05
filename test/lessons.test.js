@@ -25,7 +25,8 @@ const input = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event("input"
 const rows = (w, p) => [...w.document.getElementById("lessons" + p + "List").children];
 const openView = c => click(c.w, c.w.document.getElementById("lessonsLink"));
 const openForm = (c, p, entryRow) => click(c.w, entryRow || c.w.document.getElementById("lessons" + p + "AddBtn"));
-const fill = (c, p, { date, note } = {}) => {
+const fill = (c, p, { title, date, note } = {}) => {
+  if (title !== undefined) input(c.w, c.w.document.getElementById("lessons" + p + "Title"), title);
   if (date !== undefined) input(c.w, c.w.document.getElementById("lessons" + p + "Date"), date);
   if (note !== undefined) input(c.w, c.w.document.getElementById("lessons" + p + "Note"), note);
 };
@@ -255,6 +256,58 @@ console.log("\n-- newest date first --");
   openForm(c, "Pos"); fill(c, "Pos", { date: "2026-02-01", note: "Middle" }); save(c, "Pos");
   const texts = rows(c.w, "Pos").map(r => r.querySelector(".lessonrow-text").textContent);
   ok(texts.join(",") === "Latest,Middle,Earliest", "sorted newest first: " + texts.join(","));
+}
+
+console.log("\n-- each entry can carry a title --");
+{
+  const c = open({}); openView(c);
+  const form = p => c.w.document.getElementById("lessons" + p + "Form");
+  openForm(c, "Pos");
+  ok(!!c.w.document.getElementById("lessonsPosTitle"), "the Positive form has a Title field");
+  ok(!!c.w.document.getElementById("lessonsNegTitle"), "so does the Negative one");
+  ok([...form("Pos").querySelectorAll(".lessonfield > .code")].map(e => e.textContent)[0] === "Title",
+     "and it is the first field, above the date");
+  ok(c.w.document.activeElement === c.w.document.getElementById("lessonsPosTitle"),
+     "opening the form lands in it, not partway down");
+
+  fill(c, "Pos", { title: "Morning walk", date: "2026-03-04", note: "Cleared the head before standup." });
+  save(c, "Pos");
+  const row = rows(c.w, "Pos")[0];
+  ok(row.querySelector(".lessonrow-title").textContent === "Morning walk", "the title heads the row");
+  ok(row.querySelector(".lessonrow-text").textContent === "Cleared the head before standup.",
+     "with the note underneath it");
+  ok(stored(c).positive[0].title === "Morning walk", "and it is stored on the entry");
+
+  // reopening prefills it, and clearing it puts the row back to note-only
+  openForm(c, "Pos", rows(c.w, "Pos")[0]);
+  ok(c.w.document.getElementById("lessonsPosTitle").value === "Morning walk", "reopens prefilled");
+  fill(c, "Pos", { title: "  " });
+  save(c, "Pos");
+  ok(!rows(c.w, "Pos")[0].querySelector(".lessonrow-title"),
+     "blanking it drops the title line rather than leaving an empty one");
+  ok(stored(c).positive[0].title === "", "stored blank, not left at the old value");
+  ok(rows(c.w, "Pos")[0].querySelector(".lessonrow-text").textContent === "Cleared the head before standup.",
+     "and the note is still there");
+}
+
+console.log("\n-- a title alone is not an entry --");
+{
+  const c = open({}); openView(c);
+  openForm(c, "Pos");
+  fill(c, "Pos", { title: "Just a heading", note: "" });
+  save(c, "Pos");
+  ok(rows(c.w, "Pos").length === 0, "the note stays the required field");
+}
+
+console.log("\n-- an entry written before titles existed still reads --");
+{
+  const c = open({ "dailyReadout.lessons": JSON.stringify({
+    positive: [{ id: "old1", date: "2026-01-02", tags: ["Sleep"], text: "No title on this one.", _t: 1 }],
+    negative: [] }) });
+  openView(c);
+  const row = rows(c.w, "Pos")[0];
+  ok(!row.querySelector(".lessonrow-title"), "no title line invented for it");
+  ok(row.querySelector(".lessonrow-text").textContent === "No title on this one.", "and the note reads as before");
 }
 
 console.log("\n-- Cancel discards, doesn't save --");
