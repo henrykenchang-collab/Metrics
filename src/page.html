@@ -921,7 +921,7 @@
     <div class="panel-head"><span class="code">Energy &amp; Focus</span><span class="code" style="color:var(--copper)">Self-Rated</span></div>
     <div id="rates"></div>
     <div id="choices"></div>
-    <div id="napHost" class="doses tight"></div>
+    <div id="napHost"></div>
   </section>
 
   <section class="panel">
@@ -2214,11 +2214,14 @@
 
   /* Nap: a duration on its own, not a marker with a redundant checkbox
      beside it -- any value logged already says a nap happened, so there is
-     nothing a separate on/off toggle would add. One compact row. */
+     nothing a separate on/off toggle would add. Built as a `.rate-row`,
+     the same shape Mood/Motivation/Verbal Fluency already are right above
+     it, so it reads as one more line in that list rather than a different
+     kind of control -- same name size, same border-top between rows. */
   (function () {
     var nw = document.createElement("label");
-    nw.className = "doserow";
-    nw.innerHTML = '<span class="dose-name">Nap Duration:</span>' +
+    nw.className = "rate-row";
+    nw.innerHTML = '<span class="rate-name">Nap Duration</span>' +
                    '<input class="hourin" type="number" id="napHours" min="0" max="12" step="0.5" ' +
                    'placeholder="––" aria-label="Nap duration in hours">' +
                    '<span class="dose-unit">hrs</span>';
