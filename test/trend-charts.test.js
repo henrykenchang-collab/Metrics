@@ -243,5 +243,58 @@ click(c.w, c.w.document.getElementById("chartsLink"));
 click(c.w, c.w.document.getElementById("backToDaily"));
 ok(c.jar["dailyReadout.v1"] === before, "the stored log is byte-identical after a round trip through the charts view");
 
+/* One fixed span for all four charts, picked as two months, overriding the
+   per-chart windows while it is set. */
+{
+  console.log("\n-- the date range --");
+  // a year of readings, so there is a real span to pick either end of
+  const long = {};
+  for (let i = 0; i < 380; i++) long[shift(TODAY, -i)] = { sleep: 60 + (i % 25), hrv: 30 + (i % 20), _t: 1 };
+  const r = open({ "dailyReadout.v1": JSON.stringify(long) });
+  click(r.w, r.w.document.getElementById("chartsLink"));
+  const $$ = id => r.w.document.getElementById(id);
+  const change = (el, v) => { el.value = v; el.dispatchEvent(new r.w.Event("change", { bubbles: true })); };
+  const subs = () => [...r.w.document.querySelectorAll(".tc-agg")].map(e => e.textContent);
+  const disabled = () => [...r.w.document.querySelectorAll(".tc-period")].map(s => s.disabled);
+  const months = [...$$("rangeFrom").options].map(o => o.value);
+
+  ok(months.length >= 12, "both pickers list every month the log covers: " + months.length);
+  ok($$("rangeFrom").options.length === $$("rangeTo").options.length, "From and To offer the same months");
+  ok($$("rangeClear").hidden, "no Clear until a range is set");
+  ok(subs().every(s => /Last 30 days/.test(s)), "each chart starts on its own window: " + subs()[0]);
+  ok(disabled().every(d => d === false), "and its own picker is live");
+
+  const from = months[0], to = months[months.length - 1];
+  change($$("rangeFrom"), from);
+  change($$("rangeTo"), to);
+  ok(JSON.parse(r.jar["dailyReadout.trendRange"]).from === from, "the span is remembered");
+  ok(!$$("rangeClear").hidden, "Clear appears");
+  ok(subs().every(s => s === subs()[0]) && /–/.test(subs()[0]),
+     "all four charts move to the one span: " + subs()[0]);
+  ok(/monthly average/.test(subs()[0]), "a span over a quarter plots monthly");
+  ok(disabled().every(d => d === true), "and every per-chart picker stands down");
+
+  // a month or less is still plotted day by day, the same rule the rolling windows use
+  change($$("rangeFrom"), to); change($$("rangeTo"), to);
+  ok(!/average/.test(subs()[0]), "a single month plots daily: " + subs()[0]);
+  ok(subs()[0].indexOf("–") < 0, "and reads as one month, not a range from itself: " + subs()[0]);
+
+  // picked the wrong way round, it still means the span between the two
+  change($$("rangeFrom"), to); change($$("rangeTo"), from);
+  const span = JSON.parse(r.jar["dailyReadout.trendRange"]);
+  ok(span.from === from && span.to === to, "a backwards pick is read the sensible way round");
+
+  click(r.w, $$("rangeClear"));
+  ok(!r.jar["dailyReadout.trendRange"], "Clear forgets it");
+  ok(subs().every(s => /Last 30 days/.test(s)), "and every chart returns to its own window");
+  ok(disabled().every(d => d === false), "with its picker live again");
+
+  change($$("rangeFrom"), months[1]);
+  const again = open(r.jar);
+  click(again.w, again.w.document.getElementById("chartsLink"));
+  ok(/–/.test(again.w.document.querySelector(".tc-agg").textContent), "a set span survives a reload");
+  ok(!/trendRange/.test(r.jar["dailyReadout.v1"] || ""), "and never reaches the log");
+}
+
 console.log(fail ? "\n" + fail + " FAILED" : "\nall passed");
 process.exit(fail ? 1 : 0);

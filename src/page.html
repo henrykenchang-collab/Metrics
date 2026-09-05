@@ -230,6 +230,35 @@
     border-radius: 7px; padding: 3px 5px; flex: none; cursor: pointer;
   }
   .tc-period:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  /* a per-chart picker the fixed range has taken over: still readable, so
+     you can see what it will fall back to, but plainly not in charge */
+  .tc-period:disabled { opacity: .45; cursor: default; }
+
+  /* The fixed-span picker. One control above all four charts rather than one
+     each: a shared span is what lets the four be read against each other,
+     and four more dropdowns would be more furniture than the view can hold. */
+  .tc-rangebar {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+    box-shadow: var(--shadow); padding: 11px 16px 12px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .tc-rangerow { display: flex; align-items: flex-end; gap: 8px; }
+  .tc-rangefield { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+  .tc-rangefield > .code { color: var(--ink-3); }
+  .tc-rangesel {
+    font: inherit; font-size: 13px; width: 100%; padding: 6px 8px; color: var(--ink);
+    background: var(--surface-2); border: 1px solid transparent; border-radius: 8px;
+    -webkit-appearance: none; appearance: none;
+  }
+  .tc-rangesel:focus { border-color: var(--accent); }
+  .tc-rangedash { color: var(--ink-3); flex: none; padding-bottom: 8px; }
+  .tc-rangeclear {
+    flex: none; font-family: var(--mono); font-size: 10px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--ink-3); padding: 7px 9px;
+    border: 1px dashed var(--line-2); border-radius: 6px;
+  }
+  .tc-rangeclear[hidden] { display: none; }
+  .tc-rangenote { margin: 0; font-size: 11.5px; color: var(--ink-2); line-height: 1.35; }
   .tc-svg { width: 100%; height: auto; display: block; overflow: visible; touch-action: pan-y; }
   /* Thin and small on purpose: at up to ~300 points across one small chart,
      a bold line and full-size dots read as noise rather than a trend --
@@ -1029,6 +1058,21 @@
     <span class="code chartsTitle">Trend Charts</span>
     <button class="code viewlink" id="backToDaily" type="button">← Daily Readout</button>
   </header>
+
+  <!-- one fixed span for all four charts, so they stay readable against
+       each other; the per-chart pickers below stand down while it is set -->
+  <div class="tc-rangebar">
+    <div class="tc-rangerow">
+      <label class="tc-rangefield"><span class="code">From</span>
+        <select class="tc-rangesel" id="rangeFrom" aria-label="Range start month"></select></label>
+      <span class="tc-rangedash" aria-hidden="true">–</span>
+      <label class="tc-rangefield"><span class="code">To</span>
+        <select class="tc-rangesel" id="rangeTo" aria-label="Range end month"></select></label>
+      <button class="tc-rangeclear" id="rangeClear" type="button" hidden>Clear</button>
+    </div>
+    <p class="tc-rangenote" id="rangeNote"></p>
+  </div>
+
   <div id="trendCharts"></div>
 </div>
 
@@ -2796,6 +2840,23 @@
   function monthOnly(k) {
     return fromISO(k).toLocaleDateString(undefined, { month: "short" });
   }
+  /* A "YYYY-MM" month, named with a four-digit year on purpose: the charts'
+     own "Sep 26" is unambiguous against an axis, but the same string in a
+     sentence -- beside "the 1st", or either side of a range dash -- reads
+     as a day of the month instead. */
+  function monthLabel(p) {
+    return fromISO(p + "-01").toLocaleDateString(undefined, { month: "short", year: "numeric" });
+  }
+  function nextMonth(p) {
+    var y = +p.slice(0, 4), m = +p.slice(5, 7) + 1;
+    if (m > 12) { m = 1; y++; }
+    return y + "-" + (m < 10 ? "0" : "") + m;
+  }
+  function monthEnd(p) {                     // the month's last day, as a date
+    var d = fromISO(nextMonth(p) + "-01");
+    d.setDate(d.getDate() - 1);
+    return iso(d);
+  }
 
   function weekLine() {
     var today = todayISO(), net = weekNet(today, "extraIr");
@@ -3057,11 +3118,6 @@
     var p = taskPeriod(todayISO());
     return TASK_REMINDERS.filter(function (t) { return !taskIsDone(t, p); });
   }
-  /* Four-digit year on purpose: the charts' "Sep 26" is unambiguous against
-     an axis, but sitting in a sentence beside "the 1st" it reads as a day. */
-  function taskMonth(p) {
-    return fromISO(p + "-01").toLocaleDateString(undefined, { month: "short", year: "numeric" });
-  }
 
   function taskRow(t, p, detail) {
     return '<button class="taskrow' + (taskIsDone(t, p) ? " done" : "") + '" type="button" data-task="' + t.key + '" ' +
@@ -3109,7 +3165,7 @@
     TASK_REMINDERS.forEach(function (t) {
       var last = taskLastDone(t), detail;
       if (taskIsDone(t, p)) detail = "Done this month.";
-      else detail = last ? "Due now — last done " + esc(taskMonth(last)) + "."
+      else detail = last ? "Due now — last done " + esc(monthLabel(last)) + "."
                          : "Due now — not done yet.";
       html += taskRow(t, p, detail);
     });
@@ -3598,11 +3654,65 @@
     return TREND_PERIODS[1];          // a month by default
   }
 
+  /* A fixed span, when one is set: two months rather than two dates, since
+     that is the unit a span this long is actually chosen in. Shared by all
+     four charts and, like the per-chart windows above, a preference -- it
+     never enters the log or the sync. */
+  var RANGESTORE = "dailyReadout.trendRange";
+  var trendRange = null;                     // { from: "2025-06", to: "2026-06" }
+  try {
+    var savedRange = JSON.parse(localStorage.getItem(RANGESTORE) || "null");
+    if (savedRange && savedRange.from && savedRange.to) trendRange = savedRange;
+  } catch (e) {}
+  function saveTrendRange() {
+    try {
+      if (trendRange) localStorage.setItem(RANGESTORE, JSON.stringify(trendRange));
+      else localStorage.removeItem(RANGESTORE);
+    } catch (e) {}
+  }
+
+  // every month the log touches, oldest first, so the pickers offer exactly
+  // the span there is something to plot in
+  function loggedMonths() {
+    var ks = Object.keys(data).filter(function (k) { return logged(data[k]); }).sort();
+    var m = ks.length ? ks[0].slice(0, 7) : todayISO().slice(0, 7);
+    var last = todayISO().slice(0, 7);
+    if (ks.length && ks[ks.length - 1].slice(0, 7) > last) last = ks[ks.length - 1].slice(0, 7);
+    var out = [];
+    while (m <= last) { out.push(m); m = nextMonth(m); }
+    return out;
+  }
+
+  // one month picked at both ends is one month, not a range from itself
+  function rangeSpanLabel() {
+    if (!trendRange) return "";
+    return trendRange.from === trendRange.to ? monthLabel(trendRange.from)
+      : monthLabel(trendRange.from) + " – " + monthLabel(trendRange.to);
+  }
+
+  /* The span wears the same shape a rolling window has, so the chart builder
+     never has to know which of the two it was handed. How finely it plots
+     follows from its length by the rule the rolling windows already use:
+     days for a month or less, weeks up to a quarter, months beyond that. */
+  function rangePeriod() {
+    if (!trendRange) return null;
+    var from = trendRange.from + "-01", to = monthEnd(trendRange.to);
+    var days = Math.round((fromISO(to).getTime() - fromISO(from).getTime()) / 864e5) + 1;
+    var base = days <= 31 ? TREND_PERIODS[1] : days <= 92 ? TREND_PERIODS[2] : TREND_PERIODS[3];
+    var span = rangeSpanLabel();
+    var grain = base.id === "quarter" ? " · weekly average"
+              : base.id === "year" ? " · monthly average" : "";
+    return { id: "range", from: from, to: to, days: days,
+             at: base.at, ticks: base.ticks, tip: base.tip, range: base.range,
+             sub: span + grain, window: span };
+  }
+
   function periodPoints(key, period) {
-    var today = todayISO(), from = shift(today, -(period.days - 1));
+    var to = period.to || todayISO();
+    var from = period.from || shift(to, -(period.days - 1));
     var buckets = {};
     Object.keys(data).forEach(function (k) {
-      if (k < from || k > today) return;             // the window, not the whole log
+      if (k < from || k > to) return;                // the window, not the whole log
       var v = data[k][key];
       if (typeof v !== "number") return;
       var b = period.at(k);
@@ -3629,15 +3739,20 @@
   }
 
   function buildTrendChart(spec) {
-    var period = periodFor(spec.key);
+    /* The fixed span wins while it is set; the chart's own window is still
+       shown in the picker, greyed, so it is clear what Clear returns to. */
+    var ranged = rangePeriod();
+    var own = periodFor(spec.key);
+    var period = ranged || own;
     var pts = periodPoints(spec.key, period);
 
     var wrap = document.createElement("div");
     wrap.className = "trend-chart";
 
-    var picker = '<select class="tc-period" aria-label="' + esc(spec.label) + ' period">' +
+    var picker = '<select class="tc-period" aria-label="' + esc(spec.label) + ' period"' +
+      (ranged ? ' disabled title="A date range is set above"' : '') + '>' +
       TREND_PERIODS.map(function (p) {
-        return '<option value="' + p.id + '"' + (p.id === period.id ? " selected" : "") + '>' + p.label + '</option>';
+        return '<option value="' + p.id + '"' + (p.id === own.id ? " selected" : "") + '>' + p.label + '</option>';
       }).join("") + '</select>';
 
     /* The picker rides along even with nothing to plot: a period with too
@@ -3763,7 +3878,44 @@
     });
   }
 
+  /* Both pickers list every month the log covers. They show the current
+     span even with no range set -- the full history, which is what Clear
+     falls back to -- so the control reads as a span either way; the note
+     underneath is what says whether it is actually in charge. */
+  function renderRangeBar() {
+    var months = loggedMonths();
+    var from = trendRange ? trendRange.from : months[0];
+    var to = trendRange ? trendRange.to : months[months.length - 1];
+    ["rangeFrom", "rangeTo"].forEach(function (id, i) {
+      var sel = $(id), pick = i ? to : from;
+      sel.innerHTML = months.map(function (m) {
+        return '<option value="' + m + '"' + (m === pick ? " selected" : "") + '>' + esc(monthLabel(m)) + '</option>';
+      }).join("");
+    });
+    $("rangeClear").hidden = !trendRange;
+    $("rangeNote").textContent = trendRange
+      ? "All four charts are showing " + rangeSpanLabel() +
+        ". Their own pickers are paused until you clear it."
+      : "Each chart is using its own window. Pick a From and To to hold all four to one span.";
+  }
+
+  function applyRange(from, to) {
+    if (from > to) { var t = from; from = to; to = t; }   // picked backwards: read it the way round it makes sense
+    trendRange = { from: from, to: to };
+    saveTrendRange();
+    renderTrendCharts();
+  }
+
+  $("rangeFrom").addEventListener("change", function () { applyRange(this.value, $("rangeTo").value); });
+  $("rangeTo").addEventListener("change", function () { applyRange($("rangeFrom").value, this.value); });
+  $("rangeClear").addEventListener("click", function () {
+    trendRange = null;
+    saveTrendRange();
+    renderTrendCharts();
+  });
+
   function renderTrendCharts() {
+    renderRangeBar();
     var host = $("trendCharts");
     host.innerHTML = "";
     TREND_CHARTS.forEach(function (spec) { host.appendChild(buildTrendChart(spec)); });
