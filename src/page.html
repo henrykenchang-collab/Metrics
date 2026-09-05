@@ -363,6 +363,14 @@
   .taskrow.done .taskbox { background: var(--accent); border-color: var(--accent); }
   .taskrow.done .taskbox svg { opacity: 1; transform: scale(1); }
   .taskrow.done .alert-name { color: var(--ink-3); }
+  /* On the readout every due row carries the same one fact, so it rides
+     beside the name rather than under it -- three stacked lines of "Due the
+     1st" is three lines of the readout spent saying one thing three times.
+     It still wraps to its own line if the name is long enough to need it.
+     The page behind keeps the stacked shape, where each line differs. */
+  .taskrow.tight { padding: 6px 16px; align-items: center; }
+  .taskrow.tight .taskbox { margin-top: 0; }
+  .taskrow.tight .alert-body { flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: 0 7px; }
 
   /* ---------------- panels ---------------- */
   .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
@@ -3119,8 +3127,9 @@
     return TASK_REMINDERS.filter(function (t) { return !taskIsDone(t, p); });
   }
 
-  function taskRow(t, p, detail) {
-    return '<button class="taskrow' + (taskIsDone(t, p) ? " done" : "") + '" type="button" data-task="' + t.key + '" ' +
+  function taskRow(t, p, detail, tight) {
+    return '<button class="taskrow' + (taskIsDone(t, p) ? " done" : "") + (tight ? " tight" : "") +
+             '" type="button" data-task="' + t.key + '" ' +
              'aria-pressed="' + (taskIsDone(t, p) ? "true" : "false") + '">' + TASK_TICK +
              '<span class="alert-body"><span class="alert-name">' + esc(t.name) + '</span>' +
              '<span class="alert-detail">' + detail + '</span></span></button>';
@@ -3151,7 +3160,7 @@
                  '<span class="code n">' + due.length + " Due" + '</span>' +
                CHEV + '</div>' +
              '<div class="guard-body">';
-    due.forEach(function (t) { html += taskRow(t, p, "Due the 1st of the month."); });
+    due.forEach(function (t) { html += taskRow(t, p, "Due the 1st", true); });
     html += '</div>';
     host.innerHTML = html;
     wireFold(host, "tasks");

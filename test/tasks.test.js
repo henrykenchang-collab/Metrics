@@ -43,6 +43,17 @@ ok(/3 Due/.test(panel(c.w).querySelector(".guard-head").textContent), "counting 
 ok(names(panel(c.w)).join(" | ") === "Shanti Heartworm | Clean CPAP | Clean Expresso Machine",
    "the three tasks: " + names(panel(c.w)).join(" | "));
 
+console.log("\n-- the readout keeps each task to one line --");
+ok([...panel(c.w).querySelectorAll(".taskrow")].every(r => r.classList.contains("tight")),
+   "every panel row is the tight variant");
+ok([...panel(c.w).querySelectorAll(".alert-detail")].every(d => d.textContent === "Due the 1st"),
+   "with the message beside the name, not a sentence under it");
+{
+  const css = HTML.replace(/\s+/g, " ");
+  ok(/\.taskrow\.tight \.alert-body \{[^}]*flex-direction: row/.test(css),
+     "and the CSS lays that body out in a row");
+}
+
 console.log("\n-- the page lists them too --");
 click(c.w, c.w.document.getElementById("tasksLink"));
 ok(c.w.document.getElementById("dailyView").hidden === true, "the daily view stands aside");
