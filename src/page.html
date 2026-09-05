@@ -139,6 +139,23 @@
   .date { font-size: 20px; font-weight: 700; letter-spacing: -.02em; display: block; margin-top: 1px; }
   .today-btn { display: inline-block; margin-top: 3px; color: var(--ink-3); border-bottom: 1px dashed var(--line-2); }
   .today-btn[hidden] { display: none; }
+  /* the calendar icon next to the date -- a fast way past a year of daily
+     taps, since the native picker opens straight to month/year navigation
+     rather than making you click back one day at a time */
+  .date-row { display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .jump-btn {
+    flex: none; width: 20px; height: 20px; display: grid; place-items: center;
+    color: var(--ink-3); border-radius: 5px;
+  }
+  .jump-btn svg { width: 15px; height: 15px; }
+  .jump-btn:active { transform: scale(.9); }
+  /* same reveal-on-tap shape as a marker's own start-date trigger: hidden
+     until opened, laid out normally (and briefly) while the picker is up */
+  .jump-input {
+    font: 10.5px var(--mono); color: var(--ink-3); background: none; border: none;
+    padding: 0; cursor: pointer; -webkit-appearance: none; appearance: none;
+  }
+  .jump-input[hidden] { display: none; }
 
   /* ---------------- trend charts view ---------------- */
   /* `display: flex` on its own would win over the browser's built-in
@@ -817,7 +834,15 @@
     </button>
     <div class="datewrap">
       <span class="code dow" id="dow">—</span>
-      <span class="date" id="date">—</span>
+      <span class="date-row">
+        <span class="date" id="date">—</span>
+        <button class="jump-btn" id="jumpBtn" type="button" aria-label="Jump to Date">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>
+          </svg>
+        </button>
+        <input class="jump-input" type="date" id="jumpDate" tabindex="-1" hidden aria-label="Jump to date">
+      </span>
       <button class="code today-btn" id="todayBtn" hidden>Back to Today</button>
     </div>
     <button class="shuttle" id="next" aria-label="Next Day">
@@ -2939,6 +2964,7 @@
     $("date").textContent = dt.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
     $("todayBtn").hidden = isToday;
     $("next").disabled = isToday;
+    if (document.activeElement !== $("jumpDate")) { $("jumpDate").value = cur; $("jumpDate").max = todayISO(); }
     $("markerPto").setAttribute("aria-pressed", d.pto ? "true" : "false");
     $("dailyRest").setAttribute("aria-pressed", d.dailyRest ? "true" : "false");
 
@@ -3704,6 +3730,21 @@
   $("prev").addEventListener("click", function () { cur = shift(cur, -1); render(); });
   $("next").addEventListener("click", function () { if (cur < todayISO()) { cur = shift(cur, 1); render(); } });
   $("todayBtn").addEventListener("click", function () { cur = todayISO(); render(); });
+
+  /* the calendar icon: a native date picker opens straight to month/year
+     navigation, so jumping back a year is a couple of taps instead of
+     hundreds of clicks on Previous Day */
+  $("jumpBtn").addEventListener("click", function () {
+    $("jumpDate").hidden = false;
+    try { $("jumpDate").showPicker(); } catch (err) { $("jumpDate").focus(); }
+  });
+  $("jumpDate").addEventListener("change", function () {
+    var v = this.value;
+    if (v) cur = v < todayISO() ? v : todayISO();
+    this.hidden = true;
+    render();
+  });
+  $("jumpDate").addEventListener("blur", function () { this.hidden = true; });
 
   function typing() {
     var a = document.activeElement;
