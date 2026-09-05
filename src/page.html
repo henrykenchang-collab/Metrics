@@ -307,6 +307,11 @@
 
   /* the title takes the slack so the status and chevron stay right-aligned */
   .panel-head > .code:first-child, .panel-head > .mnav { flex: 1; }
+  /* the PTO toggle rides right beside the Daily Markers title, in the slack
+     that title's own flex:1 already claims -- not spread out to the far
+     right with Start Date and Streak, since it is a property of the day,
+     not a per-row column */
+  .mkr-head { display: flex; align-items: center; gap: 8px; }
   .panel-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   /* folded shut, the rule underneath would be a line under nothing */
   .panel-head.shut { border-bottom: 0; }
@@ -432,22 +437,35 @@
   .doserow { display: flex; align-items: center; gap: 8px; padding: 9px 16px; border-bottom: 1px solid var(--line); }
   .doserow:last-child { border-bottom: 0; }
   .dose-name { flex: 1; font-size: 15px; font-weight: 500; letter-spacing: -.01em; }
-  .dosein {
-    font-family: var(--mono); font-variant-numeric: tabular-nums;
-    font-size: 15px; font-weight: 700; width: 5.6ch; text-align: right;
-    padding: 0; color: var(--accent); background: none; border: 0;
-    -webkit-appearance: none; appearance: none;
-  }
-  .dosein::placeholder { color: var(--line-2); }
   .dose-unit { flex: none; font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
-  .stepper { display: flex; flex-direction: column; flex: none; gap: 2px; }
-  .step-btn {
-    width: 20px; height: 14px; display: flex; align-items: center; justify-content: center;
-    font-size: 8px; line-height: 1; color: var(--ink-3); background: var(--surface-2);
-    border: 1px solid var(--line); border-radius: 4px; padding: 0;
-    -webkit-tap-highlight-color: transparent;
+  /* Extra/Under IR & XR: a signed range gets a slider rather than a typed
+     number or a pair of small arrows -- the same reuse of a big native
+     control that Bed/Wake already get from type="time", easy to drag with
+     a thumb instead of needing to land on something tiny. Two lines, not
+     one: the name and live reading up top, the full-width track below. */
+  .doserow.slider { flex-direction: column; align-items: stretch; gap: 8px; padding-bottom: 12px; }
+  .dose-top { display: flex; align-items: baseline; gap: 8px; }
+  .dose-readout { display: flex; align-items: baseline; gap: 4px; flex: none; }
+  .dose-val {
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 15px; font-weight: 700; color: var(--accent); min-width: 3ch; text-align: right;
   }
-  .step-btn:active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+  .doseslider { width: 100%; height: 26px; margin: 0; background: none; -webkit-appearance: none; appearance: none; }
+  /* the track and thumb are styled per-engine -- Chrome/Safari and Firefox
+     each need their own pseudo-elements, so both are spelled out rather
+     than leaning on one to fall back to the other's default chrome, which
+     does not match between light and dark */
+  .doseslider::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--surface-2); }
+  .doseslider::-moz-range-track { height: 6px; border-radius: 3px; background: var(--surface-2); }
+  .doseslider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); border: 3px solid var(--surface); box-shadow: var(--shadow);
+    margin-top: -10px; cursor: pointer;
+  }
+  .doseslider::-moz-range-thumb {
+    width: 26px; height: 26px; border-radius: 50%; background: var(--accent); border: 3px solid var(--surface);
+    box-shadow: var(--shadow); cursor: pointer;
+  }
   .datein {
     font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums;
     padding: 0; color: var(--accent); background: none; border: 0; text-align: right;
@@ -859,7 +877,7 @@
   </section>
 
   <section class="panel">
-    <div class="panel-head"><span class="code">Daily Markers</span><span class="code">Start Date</span><span class="code">Streak</span></div>
+    <div class="panel-head"><span class="code mkr-head">Daily Markers<button class="excuse" id="markerPto" type="button" aria-pressed="false">PTO</button></span><span class="code">Start Date</span><span class="code">Streak</span></div>
     <div id="rows"></div>
     <div class="doses" id="extras"></div>
   </section>
@@ -1041,23 +1059,19 @@
        one you skipped: it makes the day not due, so it reads N/A and counts
        nowhere -- not in the streak, the readout, the guardrails, the month
        table or Patterns. `m.excuse` is a reason specific to one marker
-       (Rain only ever applies to a walk); PTO is the same idea but offered
-       on every marker independently, since a vacation day might excuse one
-       habit and not another -- see the universal PTO button built into
-       every row below, rather than a schema field here. `noPto` opts a
-       marker out of that button entirely -- Shanti and Buddha's own
-       panel doesn't carry a work-vacation concept. */
+       (Rain only ever applies to a walk); PTO is the same idea applied to
+       every marker at once from a single day-level toggle -- see isDue(). */
     { key: "walkpm",      code: "WLK", name: "Walk with Shanti", sub: "PM",
-      days: [0, 1, 2, 3, 4, 5], group: "petrows", noPto: true,
+      days: [0, 1, 2, 3, 4, 5], group: "petrows",
       excuse: { key: "walkRain", label: "Rain" } },
     /* Weekly, not daily — due on Sunday only — and, being brand new
        practices as of today, `since` keeps any day before this one from
        ever reading as a lapse. `noGrid` keeps them off the month table:
        once-a-week rows would read mostly as ghost squares there. */
     { key: "buddhaBrush", code: "BUD", name: "Buddha Brush", group: "petrows",
-      days: [0], since: "2026-08-30", noGrid: true, noPto: true },
+      days: [0], since: "2026-08-30", noGrid: true },
     { key: "shantiBrush", code: "SHA", name: "Shanti Brush", group: "petrows",
-      days: [0], since: "2026-08-30", noGrid: true, noPto: true }
+      days: [0], since: "2026-08-30", noGrid: true }
   ];
 
   /* The individual vitamins under Vitamins: a reference sheet, not a
@@ -1118,8 +1132,8 @@
   var EXTRAS = [
     /* signed: a negative is a dose skipped, so the field reads as net
        deviation from the usual rather than as an amount taken */
-    { key: "extraIr", code: "IR", label: "Extra/Under IR", min: -40, max: 40, unit: "mg", signed: true, stepper: true },
-    { key: "extraXr", code: "XR", label: "Extra/Under XR", min: -40, max: 40, unit: "mg", signed: true, stepper: true }
+    { key: "extraIr", code: "IR", label: "Extra/Under IR", min: -40, max: 40, unit: "mg" },
+    { key: "extraXr", code: "XR", label: "Extra/Under XR", min: -40, max: 40, unit: "mg" }
   ];
 
   /* What is left is a matter of the calendar, not of counting: a refill covers
@@ -1387,19 +1401,22 @@
   function hm(m) { return Math.floor(m / 60) + "h " + String(m % 60).padStart(2, "0") + "m"; }
 
   /* ---- schedules ---- */
-  // every marker's own, independent PTO excuse -- see the comment on walkpm above
-  function ptoKey(m) { return m.key + "Pto"; }
   /* `noHoliday` drops the federal holidays out of a weekday schedule, for the
      things that are only due because it is a working day. Everything that
      asks whether a marker is due -- the streaks, the readout's denominator,
      the month grid and the export -- comes through here, so the holiday is
-     never a miss anywhere. */
+     never a miss anywhere.
+
+     PTO is a single day-level toggle (see the Daily Markers panel head),
+     not a schema field: a vacation day excuses every marker that was left
+     alone, but a marker actually checked that day is something you chose
+     to do anyway, and still counts everywhere a done day would. */
   function isDue(m, k) {
     if (m.since && k < m.since) return false;
     if (m.days && m.days.indexOf(dow(k)) < 0) return false;
     if (m.noHoliday && holidayName(k)) return false;
     if (m.excuse && data[k] && data[k][m.excuse.key]) return false;
-    if (!m.noPto && data[k] && data[k][ptoKey(m)]) return false;
+    if (data[k] && data[k].pto && !data[k][m.key]) return false;
     return true;
   }
 
@@ -1795,62 +1812,57 @@
 
   /* `compact` renders a dose as one line — "Extra IR: 10 mg" — at the size of
      a marker row. A tall cell with a 23px number and a gauge was more furniture
-     than a milligram figure needs, and it sat next to eleven one-line markers. */
+     than a milligram figure needs, and it sat next to eleven one-line markers.
+     It is also the only place a signed field lives, so it gets a slider
+     rather than a number field: one big native control you drag with a
+     thumb, the same reuse of the browser's own control that Bed/Wake
+     already get from type="time" -- a keyboard field, or a pair of arrows
+     small enough to miss, both ask more precision from a thumb than this
+     needs. */
   function buildNumericFields(list, hostId, compact) { list.forEach(function (s) {
     var wrap = document.createElement("label");
-    wrap.className = compact ? "doserow" : "stat";
-    /* signed fields (Extra/Under IR & XR) get a real number input: the
-       up/down spinner, and on desktop a mouse-wheel scroll while focused
-       steps the value -- reusing the browser's own control, the same way
-       Bed/Wake reuse type="time" rather than a picker built by hand. */
-    var numAttrs = s.signed
-      ? 'type="number" min="' + s.min + '" max="' + s.max + '" step="1"'
-      : 'type="text" maxlength="' + (s.len || 4) + '"';
-    wrap.innerHTML = compact
-      ? '<span class="dose-name">' + s.label + ':</span>' +
-        (s.stepper ? '<span class="stepper">' +
-          '<button type="button" class="step-btn step-up" aria-label="Increase ' + s.label + '">▲</button>' +
-          '<button type="button" class="step-btn step-down" aria-label="Decrease ' + s.label + '">▼</button>' +
-        '</span>' : '') +
-        '<input class="dosein" ' + numAttrs + ' inputmode="numeric" placeholder="––" ' +
-          'aria-label="' + s.label + ' (' + s.min + ' to ' + s.max + ')">' +
-        (s.unit ? '<span class="dose-unit">' + s.unit + '</span>' : "")
-      : '<span class="code stat-label">' + (s.short || s.label) + '</span>' +
-        '<span class="stat-in"><input class="numin" type="text" inputmode="' + (s.decimal ? "decimal" : "numeric") +
-          '" placeholder="––" maxlength="' + (s.len || 3) + '" ' +
-          'aria-label="' + s.label + ' (' + s.min + ' to ' + s.max + ')"><span class="stat-unit">' + s.unit + '</span></span>' +
-        (s.pctOfBed ? '<span class="stat-pct"></span>' : '') +
-        '<span class="gauge"><i></i></span>';
+    wrap.className = compact ? "doserow slider" : "stat";
+    if (compact) {
+      wrap.innerHTML =
+        '<div class="dose-top"><span class="dose-name">' + s.label + ':</span>' +
+          '<span class="dose-readout"><span class="dose-val">––</span>' +
+          (s.unit ? '<span class="dose-unit">' + s.unit + '</span>' : "") + '</span></div>' +
+        '<input class="doseslider" type="range" min="' + s.min + '" max="' + s.max + '" step="1" value="0" ' +
+          'aria-label="' + s.label + ' (' + s.min + ' to ' + s.max + ' ' + s.unit + ')">';
+      var slider = wrap.querySelector(".doseslider"), val = wrap.querySelector(".dose-val");
+      slider.addEventListener("input", function () {
+        var v = +slider.value;
+        val.textContent = v > 0 ? "+" + v : String(v);
+        var d = day(cur);
+        d[s.key] = v;
+        save(cur);
+        renderSummary();
+        renderSupply();          // the pack reads from these very fields
+      });
+      slider.addEventListener("change", function () {
+        renderSummary(); renderSupply(); renderGrid(); renderPatterns(); renderGuard();
+      });
+      $(hostId).appendChild(wrap);
+      statNodes[s.key] = { input: slider, val: val, spec: s };
+      return;
+    }
+
+    wrap.innerHTML =
+      '<span class="code stat-label">' + (s.short || s.label) + '</span>' +
+      '<span class="stat-in"><input class="numin" type="text" inputmode="' + (s.decimal ? "decimal" : "numeric") +
+        '" placeholder="––" maxlength="' + (s.len || 3) + '" ' +
+        'aria-label="' + s.label + ' (' + s.min + ' to ' + s.max + ')"><span class="stat-unit">' + s.unit + '</span></span>' +
+      (s.pctOfBed ? '<span class="stat-pct"></span>' : '') +
+      '<span class="gauge"><i></i></span>';
     var input = wrap.querySelector("input"), fill = wrap.querySelector(".gauge > i");
     var pct = wrap.querySelector(".stat-pct");
-
-    /* the browser's own spinner is invisible here (`.dosein` turns off
-       native appearance for the borderless look every other field uses),
-       so this pair is the only way to click a step rather than type or
-       scroll one -- same clamp the blur handler already enforces, and the
-       same `input` event so gauge/band/pct/save all run exactly once. */
-    if (s.stepper) {
-      var stepBy = function (delta) {
-        var d = day(cur);
-        var v = (d[s.key] !== undefined ? d[s.key] : 0) + delta;
-        input.value = Math.min(s.max, Math.max(s.min, v));
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-      };
-      wrap.querySelector(".step-up").addEventListener("click", function (e) { e.preventDefault(); stepBy(1); });
-      wrap.querySelector(".step-down").addEventListener("click", function (e) { e.preventDefault(); stepBy(-1); });
-    }
 
     input.addEventListener("focus", function () { input.select(); });
     input.addEventListener("input", function () {
       var clean;
-      if (s.signed) {
-        // type="number" already keeps the value numeric-shaped, so there
-        // is nothing left to strip by hand -- but a lone "-" mid-typing is
-        // not a number yet either, same as the old text field
-        clean = (input.value === "-") ? "" : input.value;
-      } else if (s.decimal) {
+      if (s.decimal) {
         // one decimal place -- "7." is left as a legal in-progress state,
-        // same reasoning as a signed field's lone "-"
+        // the same way a lone "-" would be for a signed field
         var v2 = input.value.replace(/[^0-9.]/g, "");
         var firstDot = v2.indexOf(".");
         if (firstDot >= 0) v2 = v2.slice(0, firstDot + 1) + v2.slice(firstDot + 1).replace(/\./g, "");
@@ -2012,7 +2024,7 @@
     pillNodes[c.key] = nodes;
   });
 
-  var rowNodes = {}, excuseNodes = {}, ptoNodes = {}, startNodes = {}, vitWrapNode = null;
+  var rowNodes = {}, excuseNodes = {}, startNodes = {}, vitWrapNode = null;
   /* A div rather than a button, because a marker carrying an excuse has a
      second control inside it and a button cannot hold one. The row keeps its
      whole-surface tap target either way -- the excuse stops the click from
@@ -2028,8 +2040,6 @@
       '<span class="row-name">' + esc(m.name) + '<span class="row-sub"></span></span>' +
       (m.excuse ? '<button class="excuse own" type="button" aria-pressed="false">' +
                   esc(m.excuse.label) + '</button>' : '') +
-      // every marker gets its own, independent PTO excuse -- not just the ones with a schema `excuse` -- except `noPto` ones
-      (m.noPto ? '' : '<button class="excuse pto" type="button" aria-pressed="false">PTO</button>') +
       /* all three sit right before the checkbox, in the order they answer
          a question about it: since when (start), how far (streak), what it
          is about to extend or break (the checkbox itself). A marker counts
@@ -2064,17 +2074,6 @@
         save(cur); render();
       });
       excuseNodes[m.key] = ex;
-    }
-    if (!m.noPto) {
-      var pb = b.querySelector(".excuse.pto");
-      pb.setAttribute("aria-label", m.name + ": PTO");
-      pb.addEventListener("click", function (e) {
-        e.stopPropagation();                        // excusing it is not doing it
-        var d = day(cur), k = ptoKey(m);
-        if (d[k]) delete d[k]; else d[k] = true;
-        save(cur); render();
-      });
-      ptoNodes[m.key] = pb;
     }
     if (!m.noStreak) {
       var trig = b.querySelector(".mstart-trigger"), inp = b.querySelector(".mstart-input");
@@ -2141,6 +2140,17 @@
         saveVitField(t.dataset.k, t.dataset.f, t.value.trim());
       });
     }
+  });
+
+  /* PTO: one toggle for the whole day, not a per-marker field -- a
+     vacation day excuses every marker left untouched, but a marker you
+     checked anyway is something you chose to do, and still counts
+     everywhere a done day would (see isDue()). */
+  $("markerPto").addEventListener("click", function (e) {
+    e.stopPropagation();                 // this is not folding the panel
+    var d = day(cur);
+    if (d.pto) delete d.pto; else d.pto = true;
+    save(cur); render();
   });
 
   /* --- journal text: each pending write is bound to the day it was typed on,
@@ -2858,6 +2868,7 @@
     $("date").textContent = dt.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
     $("todayBtn").hidden = isToday;
     $("next").disabled = isToday;
+    $("markerPto").setAttribute("aria-pressed", d.pto ? "true" : "false");
 
     var dueRows = [], notDueRows = [];
     MARKERS.forEach(function (m) {
@@ -2867,9 +2878,6 @@
       node.setAttribute("aria-pressed", on ? "true" : "false");
       if (excuseNodes[m.key]) {
         excuseNodes[m.key].setAttribute("aria-pressed", d[m.excuse.key] ? "true" : "false");
-      }
-      if (ptoNodes[m.key]) {
-        ptoNodes[m.key].setAttribute("aria-pressed", d[ptoKey(m)] ? "true" : "false");
       }
 
       /* the schedule rides on the name rather than under it; still quieter
@@ -2886,7 +2894,7 @@
         /* A lit excuse already says the day is not due, and says why. A second
            pill beside it repeats that and costs enough width to wrap the name
            onto a line of its own. */
-        var excused = !!((m.excuse && d[m.excuse.key]) || (!m.noPto && d[ptoKey(m)]));
+        var excused = !!((m.excuse && d[m.excuse.key]) || (d.pto && !on));
         tag.hidden = excused;
         if (excused) {
           /* nothing more to say */
@@ -2915,12 +2923,17 @@
       if (node === rowNodes.vitamins && vitWrapNode) $("rows").appendChild(vitWrapNode);
     });
 
-    STATS.concat(STATS2).concat(EXTRAS).forEach(function (s) {
+    STATS.concat(STATS2).forEach(function (s) {
       var n = statNodes[s.key], v = d[s.key];
       n.input.value = (v === undefined || v === null) ? "" : v;
       paintGauge(s, n.fill, v === undefined ? null : v);
       paintBand(s, n.input, v === undefined ? null : v);
       paintPct(s, n.pct, v === undefined ? null : v, d);
+    });
+    EXTRAS.forEach(function (s) {
+      var n = statNodes[s.key], v = d[s.key];
+      n.input.value = v === undefined ? 0 : v;
+      n.val.textContent = v === undefined ? "––" : (v > 0 ? "+" + v : String(v));
     });
 
     /* Show the usual night even before the day has anything on it, so the
@@ -3030,13 +3043,14 @@
         var klass = "sq";
         if (o && o.future) klass += " future";
         else if (o && o.napp) klass += " napp";      // you said it did not apply
+        else if (o && o.pto) klass += " napp pto";   // excused for PTO -- same look as N/A, different word
         else if (o && o.na) klass += " na";          // never scheduled in the first place
         else if (o) klass += " " + (o.cls || cls);
         if (k === cur) klass += " sel";
         if (o && o.n !== undefined) vals.push(o.n);
         s += '<span class="' + klass + '"' + (o && o.op ? ' style="opacity:' + o.op + '"' : "") +
              ' data-d="' + k + '" title="' + esc(label + " · " + k + (o && o.t ? " · " + o.t : "")) + '">' +
-             (o && o.napp ? "N/A" : "") + '</span>';
+             (o && o.napp ? "N/A" : o && o.pto ? "PTO" : "") + '</span>';
       });
       s += '<span class="grid-sum"' + (color ? ' style="color:' + color + '"' : '') + '>' +
            summarize(vals) + '</span>';
@@ -3051,7 +3065,11 @@
       possible += dueDays;
       html += line(m.code, null, "on", function (d, k) {
         var done = !!d[m.key];
-        if (!isDue(m, k)) return done ? { op: .5, t: "done, off schedule", cls: "on" } : { na: true };
+        if (!isDue(m, k)) {
+          if (done) return { op: .5, t: "done, off schedule", cls: "on" };
+          if (d.pto) return { pto: true, t: "PTO" };
+          return { na: true };
+        }
         if (done) { hit++; return { op: 1, t: "done", n: 1 }; }
         /* Red means you logged the day and this was not done. A day with
            nothing on it stays blank: not opening the app is not a miss. */
