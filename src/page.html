@@ -876,6 +876,10 @@
     </div>
   </section>
 
+  <!-- TASK REMINDERS — recurring to-dos with no daily row of their own,
+       same fold shape as Guardrails and sitting right above it -->
+  <section class="guard" id="tasks" aria-live="polite"></section>
+
   <!-- GUARDRAILS — warnings need to be seen, so they sit above the journal -->
   <section class="guard" id="guard" aria-live="polite"></section>
 
@@ -1181,8 +1185,8 @@
   var EXTRAS = [
     /* signed: a negative is a dose skipped, so the field reads as net
        deviation from the usual rather than as an amount taken */
-    { key: "extraIr", code: "IR", label: "Extra/Under IR", min: -30, max: 60, unit: "mg" },
-    { key: "extraXr", code: "XR", label: "Extra/Under XR", min: -40, max: 40, unit: "mg" }
+    { key: "extraIr", code: "IR", label: "Extra/Under IR", min: -30, max: 60, step: 5, unit: "mg" },
+    { key: "extraXr", code: "XR", label: "Extra/Under XR", min: -40, max: 40, step: 5, unit: "mg" }
   ];
 
   /* What is left is a matter of the calendar, not of counting: a refill covers
@@ -1884,7 +1888,7 @@
         '<div class="dose-top"><span class="dose-name">' + s.label + ':</span>' +
           '<span class="dose-readout"><span class="dose-val">––</span>' +
           (s.unit ? '<span class="dose-unit">' + s.unit + '</span>' : "") + '</span></div>' +
-        '<input class="doseslider" type="range" min="' + s.min + '" max="' + s.max + '" step="1" value="0" ' +
+        '<input class="doseslider" type="range" min="' + s.min + '" max="' + s.max + '" step="' + (s.step || 1) + '" value="0" ' +
           'aria-label="' + s.label + ' (' + s.min + ' to ' + s.max + ' ' + s.unit + ')">';
       var slider = wrap.querySelector(".doseslider"), val = wrap.querySelector(".dose-val");
       slider.addEventListener("input", function () {
@@ -2947,7 +2951,7 @@
         'All clear — nothing missed more than ' + MISS_LIMIT + ' scheduled days running, nothing trending down.</div>' +
         '</div>';
       host.innerHTML = html;
-      wireGuardFold(host);
+      wireFold(host, "guard");
       return;
     }
 
@@ -2959,19 +2963,55 @@
     });
     html += '</div>';
     host.innerHTML = html;
-    wireGuardFold(host);
+    wireFold(host, "guard");
   }
 
-  /* Re-wired on every render, because renderGuard replaces its own markup */
-  function wireGuardFold(host) {
+  /* ============================================================
+     Task Reminders
+     Recurring to-dos that are not a daily habit and carry no streak of
+     their own -- they just come due on a fixed date. Sits above
+     Guardrails, in the same fold shape, since both are "look up here
+     first" panels rather than something you log against a day. */
+  var TASK_REMINDERS = ["Shanti Heartworm", "CPAP Clean", "Expresso Clean"];   // due the 1st of every month
+
+  function renderTasks() {
+    var host = $("tasks"), due = fromISO(todayISO()).getDate() === 1;
+    host.classList.toggle("alert", due);
+
+    var html = '<div class="guard-head" role="button" tabindex="0">' +
+                 '<span class="code">Task Reminders</span>' +
+                 '<span class="code n">' + (due ? TASK_REMINDERS.length + " Due" : "Not Due") + '</span>' +
+               CHEV + '</div>' +
+             '<div class="guard-body">';
+
+    if (!due) {
+      html += '<div class="guard-clear"><i></i>Nothing due today — these come due on the 1st of the month.</div></div>';
+      host.innerHTML = html;
+      wireFold(host, "tasks");
+      return;
+    }
+
+    TASK_REMINDERS.forEach(function (t) {
+      html += '<div class="alert-row"><span class="alert-bar"></span><span class="alert-body">' +
+                '<span class="alert-name">' + esc(t) + '</span>' +
+                '<span class="alert-detail">Due today — the 1st of the month.</span>' +
+              '</span></div>';
+    });
+    html += '</div>';
+    host.innerHTML = html;
+    wireFold(host, "tasks");
+  }
+
+  /* Re-wired on every render, because both panels replace their own markup */
+  function wireFold(host, id) {
     var head = host.querySelector(".guard-head"), body = host.querySelector(".guard-body");
     function paint() {
-      var s = isShut("guard");
+      var s = isShut(id);
       body.hidden = s;
       head.classList.toggle("shut", s);
       head.setAttribute("aria-expanded", s ? "false" : "true");
     }
-    function toggle() { setShut("guard", !isShut("guard")); paint(); }
+    function toggle() { setShut(id, !isShut(id)); paint(); }
     head.addEventListener("click", toggle);
     head.addEventListener("keydown", function (e) {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
@@ -3129,6 +3169,7 @@
     renderSupply();
     renderGrid();
     renderPatterns();
+    renderTasks();
     renderGuard();
   }
 

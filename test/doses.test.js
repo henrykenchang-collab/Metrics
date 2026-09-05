@@ -50,8 +50,8 @@ const ir=c.w.document.querySelectorAll("#supply .doseslider")[0], xr=c.w.documen
 // rather than asking for keyboard precision -- the same reuse of a native
 // control Bed/Wake already get from type="time"
 ok(ir.type==="range","a native range input");
-ok(ir.min==="-30"&&ir.max==="60"&&ir.step==="1","IR's min/max/step match its own range");
-ok(xr.min==="-40"&&xr.max==="40"&&xr.step==="1","XR's min/max/step match its own, independently");
+ok(ir.min==="-30"&&ir.max==="60"&&ir.step==="5","IR's min/max/step match its own range");
+ok(xr.min==="-40"&&xr.max==="40"&&xr.step==="5","XR's min/max/step match its own, independently");
 slide(c,ir,-20);
 ok(store(c).extraIr===-20,"a negative records: "+store(c).extraIr);
 slide(c,ir,15);
