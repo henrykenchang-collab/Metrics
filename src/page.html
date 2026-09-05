@@ -453,7 +453,7 @@
      control that Bed/Wake already get from type="time", easy to drag with
      a thumb instead of needing to land on something tiny. Two lines, not
      one: the name and live reading up top, the full-width track below. */
-  .doserow.slider { flex-direction: column; align-items: stretch; gap: 8px; padding-bottom: 12px; }
+  .doserow.slider { flex-direction: column; align-items: stretch; gap: 4px; padding: 6px 16px 8px; }
   .dose-top { display: flex; align-items: baseline; gap: 8px; }
   .dose-readout { display: flex; align-items: baseline; gap: 4px; flex: none; }
   .dose-val {
@@ -892,7 +892,6 @@
   <section class="panel">
     <div class="panel-head"><span class="code mkr-head">Daily Markers<button class="excuse" id="markerPto" type="button" aria-pressed="false">PTO</button></span><span class="code">Start Date</span><span class="code">Streak</span></div>
     <div id="rows"></div>
-    <div class="doses" id="extras"></div>
   </section>
 
   <section class="panel">
@@ -1156,6 +1155,8 @@
   var IR_DAYS = 30;       // an IR refill covers this many days
   var XR_DAYS = 30;       // an XR refill covers this many
   var LOW_DAYS = 7;       // start saying so this close to the end
+  var IR_DOSE = 20;       // a normal day's IR dose, in mg -- extra/under scales against this
+  var XR_DOSE = 30;       // same, for XR
 
   var ENERGY = [
     { key: "ePre",  code: "E1", name: "Energy", sub: "Pre-Work AM" },
@@ -1815,7 +1816,6 @@
   var statNodes = {};
   buildNumericFields(STATS, "stats");
   buildNumericFields(STATS2, "stats2");
-  buildNumericFields(EXTRAS, "extras", true);
   (function () {
     var wrap = document.createElement("label");
     wrap.className = "doserow";
@@ -1828,6 +1828,7 @@
       save(cur); render();
     });
   })();
+  buildNumericFields(EXTRAS, "supply", true);
 
   /* Daily Rest: a day IR/XR were not used, so it should not draw down the
      supply -- same shape as the PTO toggle, just scoped to the doses. */
@@ -1840,8 +1841,9 @@
 
   /* `compact` renders a dose as one line — "Extra IR: 10 mg" — at the size of
      a marker row. A tall cell with a 23px number and a gauge was more furniture
-     than a milligram figure needs, and it sat next to eleven one-line markers.
-     It is also the only place a signed field lives, so it gets a slider
+     than a milligram figure needs, and it now sits inside Vitamin Supply,
+     right below the Refill Date row. It is also the only place a signed
+     field lives, so it gets a slider
      rather than a number field: one big native control you drag with a
      thumb, the same reuse of the browser's own control that Bed/Wake
      already get from type="time" -- a keyboard field, or a pair of arrows
@@ -2644,16 +2646,26 @@
 
     /* Daily Rest: a day IR/XR genuinely were not taken, so it does not draw
        down the supply -- excluded from the elapsed count entirely, the same
-       way PTO excuses a marker rather than counting it as a miss. */
-    var gone = 0, k = start;
+       way PTO excuses a marker rather than counting it as a miss.
+
+       Extra/Under scales what a counted day draws, proportional to that
+       day's baseline dose: logging +20mg on a 20mg/day IR baseline draws
+       a full extra day; -20mg draws nothing that day. Never goes negative
+       (an under day can zero out, not refund supply). */
+    var irGone = 0, xrGone = 0, k = start;
     while (k < today) {
-      if (!(data[k] && data[k].dailyRest)) gone++;
+      var d = data[k];
+      if (!(d && d.dailyRest)) {
+        irGone += Math.max(0, 1 + ((d && d.extraIr) || 0) / IR_DOSE);
+        xrGone += Math.max(0, 1 + ((d && d.extraXr) || 0) / XR_DOSE);
+      }
       k = shift(k, 1);
     }
-    function run(span) {
-      return { left: Math.max(0, Math.min(span, span - gone)), span: span, out: shift(start, span) };
+    function run(span, gone) {
+      var left = Math.round(Math.max(0, Math.min(span, span - gone)));
+      return { left: left, span: span, out: shift(today, left) };
     }
-    return { start: start, gone: gone, ir: run(IR_DAYS), xr: run(XR_DAYS) };
+    return { start: start, ir: run(IR_DAYS, irGone), xr: run(XR_DAYS, xrGone) };
   }
 
   function shortDate(k) {
@@ -3727,7 +3739,7 @@
   }
   /* days of a given span still covered at the end of day k — the column that
      makes the export auditable without replaying it */
-  function daysLeftAt(k, span) {
+  function daysLeftAt(k, span, extraKey, dose) {
     var start = null;
     Object.keys(data).sort().forEach(function (j) {
       if (j <= k && data[j] && data[j].refill) start = data[j].refill;
@@ -3735,10 +3747,11 @@
     if (!start) return "";
     var gone = 0, j = start;
     while (j < k) {
-      if (!(data[j] && data[j].dailyRest)) gone++;
+      var d = data[j];
+      if (!(d && d.dailyRest)) gone += Math.max(0, 1 + ((d && d[extraKey]) || 0) / dose);
       j = shift(j, 1);
     }
-    return Math.max(0, Math.min(span, span - gone));
+    return Math.round(Math.max(0, Math.min(span, span - gone)));
   }
 
   function csv() {
@@ -3765,8 +3778,8 @@
         .concat(STATS.concat(STATS2).map(function (s) { return d[s.key] === undefined ? "" : d[s.key]; }))
         .concat(EXTRAS.map(function (x) { return d[x.key] === undefined ? "" : d[x.key]; }))
         .concat([d.refill || "",
-                 daysLeftAt(k, IR_DAYS),
-                 daysLeftAt(k, XR_DAYS)])
+                 daysLeftAt(k, IR_DAYS, "extraIr", IR_DOSE),
+                 daysLeftAt(k, XR_DAYS, "extraXr", XR_DOSE)])
         .concat(ENERGY.map(function (e) { return d[e.key] === NA ? "N/A" : (d[e.key] || ""); }))
         .concat([d.work === NA ? "N/A" : (d.work || "")])
         .concat(RATINGS.map(function (r) { return d[noteKey(r)] || ""; }))
