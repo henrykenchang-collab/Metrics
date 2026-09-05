@@ -1118,16 +1118,7 @@
     { key: "buddhaBrush", code: "BUD", name: "Buddha Brush", group: "petrows",
       days: [0], since: "2026-08-30", noGrid: true },
     { key: "shantiBrush", code: "SHA", name: "Shanti Brush", group: "petrows",
-      days: [0], since: "2026-08-30", noGrid: true },
-    /* Nap has no schedule to keep and nothing to add up: `days: []` means
-       isDue() never says yes, so it never enters "Markers Due Today", never
-       gets a streak (noStreak) or a start date to gate one, and never trips
-       a Guardrails lapse (noGuard, and moot anyway with no due day to miss).
-       Logging one still paints its own square on the month grid and its own
-       Yes/N/A column in the export, the same way an off-schedule Sauna day
-       already does -- it just never reads as due, or as missed. */
-    { key: "nap", code: "NAP", name: "Nap", group: "napHost",
-      days: [], noStreak: true, noGuard: true }
+      days: [0], since: "2026-08-30", noGrid: true }
   ];
 
   /* The individual vitamins under Vitamins: a reference sheet, not a
@@ -2219,32 +2210,34 @@
       });
     }
 
-    /* the duration sits right under Nap itself, the same way Vitamin
-       Details rides along under Vitamins -- it belongs to that row */
-    if (m.key === "nap") {
-      var nw = document.createElement("label");
-      nw.className = "doserow";
-      nw.innerHTML = '<span class="dose-name">Nap Duration:</span>' +
-                     '<input class="hourin" type="number" id="napHours" min="0" max="12" step="0.5" ' +
-                     'placeholder="––" aria-label="Nap duration in hours">' +
-                     '<span class="dose-unit">hrs</span>';
-      $("napHost").appendChild(nw);
-      var napInput = nw.querySelector("input");
-      napInput.addEventListener("input", function () {
-        var d = day(cur), v = napInput.value;
-        if (v === "") delete d.napHours; else d.napHours = +v;
-        save(cur);
-      });
-      napInput.addEventListener("blur", function () {
-        var d = day(cur);
-        if (typeof d.napHours === "number") {
-          var v = Math.min(12, Math.max(0, d.napHours));
-          if (v !== d.napHours) { d.napHours = v; napInput.value = v; save(cur); }
-        }
-      });
-      napHourInput = napInput;
-    }
   });
+
+  /* Nap: a duration on its own, not a marker with a redundant checkbox
+     beside it -- any value logged already says a nap happened, so there is
+     nothing a separate on/off toggle would add. One compact row. */
+  (function () {
+    var nw = document.createElement("label");
+    nw.className = "doserow";
+    nw.innerHTML = '<span class="dose-name">Nap Duration:</span>' +
+                   '<input class="hourin" type="number" id="napHours" min="0" max="12" step="0.5" ' +
+                   'placeholder="––" aria-label="Nap duration in hours">' +
+                   '<span class="dose-unit">hrs</span>';
+    $("napHost").appendChild(nw);
+    var napInput = nw.querySelector("input");
+    napInput.addEventListener("input", function () {
+      var d = day(cur), v = napInput.value;
+      if (v === "") delete d.napHours; else d.napHours = +v;
+      save(cur);
+    });
+    napInput.addEventListener("blur", function () {
+      var d = day(cur);
+      if (typeof d.napHours === "number") {
+        var v = Math.min(12, Math.max(0, d.napHours));
+        if (v !== d.napHours) { d.napHours = v; napInput.value = v; save(cur); }
+      }
+    });
+    napHourInput = napInput;
+  })();
 
   /* PTO: one toggle for the whole day, not a per-marker field -- a
      vacation day excuses every marker left untouched, but a marker you
